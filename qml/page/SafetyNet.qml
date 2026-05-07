@@ -79,16 +79,18 @@ Rectangle {
             // --- PAGE 1: EMERGENCY FUND ---
             Item {
                 id: emergencyFundPage
+                Layout.fillWidth: true
+                Layout.fillHeight: true
 
                 ColumnLayout {
                     anchors.centerIn: parent
                     width: parent.width * 0.8
-                    spacing: 20 // whitespace between sections
+                    spacing: 15 // whitespace between sections
 
                     // SAVINGS INPUT
                     ColumnLayout {
                         Layout.alignment: Qt.AlignHCenter
-                        Layout.topMargin: 5
+                        Layout.topMargin: 25
                         spacing: 12
 
                         Text { text: "HOW MUCH DO YOU HAVE SAVED TODAY?"; color: "#888"; font.pixelSize: 11; font.letterSpacing: 1; Layout.alignment: Qt.AlignHCenter }
@@ -167,8 +169,9 @@ Rectangle {
                         Text {
                             text: "OF YOUR FUND SECURED"
                             font.pixelSize: 14
+                            font.weight: Font.DemiBold;
                             font.letterSpacing: 4
-                            color: "#666"
+                            color: "#888"
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
                     }
@@ -176,6 +179,8 @@ Rectangle {
                     // SETTINGS DRAWER
                     RowLayout {
                         Layout.alignment: Qt.AlignHCenter
+                        Layout.topMargin: 20
+                        Layout.bottomMargin: 10
                         spacing: 20
 
                         // Multipliers
@@ -187,13 +192,13 @@ Rectangle {
                                     text: modelData
                                     flat: true
                                     implicitWidth: 70
-                                    palette.buttonText: multiplierIndex === index ? "#4CAF50" : "#555"
+                                    palette.buttonText: multiplierIndex === index ? "#ECEFF1" : "#555"
                                     font.bold: multiplierIndex === index
                                     onClicked: multiplierIndex = index
 
                                     background: Rectangle {
-                                        color: multiplierIndex === index ? "#1a2e1a" : "transparent"
-                                        border.color: multiplierIndex === index ? "#4CAF50" : "transparent"
+                                        color: multiplierIndex === index ? "#252525" : "transparent"
+                                        border.color: multiplierIndex === index ? "#ECEFF1" : "transparent"
                                         radius: 6; border.width: 1
                                     }
                                 }
@@ -270,15 +275,84 @@ Rectangle {
                             Layout.fillWidth: true
                             // Target Stat
                             Column {
-                                Text { text: "GOAL TARGET (based on your income)"; color: "#555"; font.pixelSize: 10; font.letterSpacing: 1 }
-                                Text { text: root.currencySymbol + targetAmount.toLocaleString(Qt.locale(), 'f', 0); color: "white"; font.pixelSize: 18; font.bold: true }
+                                Text { text: "GOAL TARGET (based on your income)"; color: "#AAA"; font.pixelSize: 10; font.weight: Font.Medium; font.letterSpacing: 1 }
+                                Text {
+                                    text: (targetAmount > 0) ? root.currencySymbol + targetAmount.toLocaleString(Qt.locale(), 'f', 0) : "Enter your Income in CashFlow or Custom"
+                                    color: (targetAmount > 0) ? "#4CAF50" : "#555"
+                                    font.pixelSize: 18
+                                    font.bold: true
+                                }
                             }
                             Item { Layout.fillWidth: true }
                             // Runway Stat
                             Column {
                                 Layout.alignment: Qt.AlignRight
-                                Text { text: "RUNWAY LEFT (Based on your Expenses)"; color: "#555"; font.pixelSize: 10; font.letterSpacing: 1; Layout.alignment: Qt.AlignRight }
-                                Text { text: runwayMonths.toFixed(1) + " Months"; color: "#2196F3"; font.pixelSize: 18; font.bold: true; Layout.alignment: Qt.AlignRight }
+                                Text { text: "RUNWAY LEFT (Based on your Expenses)"; color: "#AAA"; font.pixelSize: 10; font.weight: Font.Medium; font.letterSpacing: 1; Layout.alignment: Qt.AlignRight }
+                                Text {
+                                    text: (runwayMonths > 0) ? runwayMonths.toFixed(1) + " Months" : "Enter your Expenses in CashFlow"
+                                    color: (runwayMonths > 0) ? "#2196F3" : "#555"
+                                    font.pixelSize: 18
+                                    font.bold: true; Layout.alignment: Qt.AlignRight
+                                }
+                            }
+                        }
+
+                        // Button Layout
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 40
+                            Layout.alignment: Qt.AlignHCenter
+                            spacing: 30
+
+                            // ToDo: Save Button
+                            Button {
+                                id: saveBtn
+                                text: "Save"
+                                flat: true
+                                Layout.alignment: Qt.AlignHCenter
+                                palette.buttonText: "white"
+                                hoverEnabled: true
+
+                                onClicked: {
+                                }
+
+                                background: Rectangle {
+                                    implicitWidth: 70
+                                    implicitHeight: 22
+                                    radius: 6
+                                    color: saveBtn.hovered ? "#333" : "#222"
+
+                                    // Smoothly transition the color change
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                    border.width: 1
+                                    border.color: saveBtn.hovered ? "white" : "transparent"
+                                }
+                            }
+
+                            // Clear Button
+                            Button {
+                                id: clearBtn
+                                text: "Clear"
+                                flat: true
+                                Layout.alignment: Qt.AlignHCenter
+                                palette.buttonText: "white"
+                                hoverEnabled: true
+
+                                onClicked: { savingsInput.text = '' }
+
+                                background: Rectangle {
+                                    implicitWidth: 90
+                                    implicitHeight: 32
+                                    radius: 6
+                                    color: clearBtn.hovered ? "#333" : "#222"
+
+                                    // Smoothly transition the color change
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                    border.width: 1
+                                    border.color: clearBtn.hovered ? "white" : "transparent"
+                                }
                             }
                         }
                     }
