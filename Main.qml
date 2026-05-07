@@ -14,6 +14,8 @@ Window {
 
     // GLOBAL PROPERTIES
     property string currencySymbol: "₹" // INR
+    property real globalMonthlyIncome: cashflowPage.totalIncome
+    property real globalMonthlyExpense: cashflowPage.totalExpense
 
     // ColumnLayout to stack items vertically
     ColumnLayout {
@@ -63,7 +65,7 @@ Window {
             currentIndex: navBar.currentIndex
 
             // Disable manual mouse/touch swiping to handle navigation via TabBar
-            interactive: true
+            interactive: false
 
             // Transition speed
             Component.onCompleted: contentItem.highlightMoveDuration = 300
