@@ -12,7 +12,20 @@ Rectangle {
     readonly property real totalExpense: Number(expense1.text) + Number(expense2.text) + Number(expense3.text) + Number(expense4.text)
     readonly property real totalSurplus: totalIncome - totalExpense
     readonly property real savingsRate: totalIncome > 0 ? (totalSurplus / totalIncome) * 100 : 0
-    property int currentQuoteIndex: 1
+
+    property int currentQuoteIndex: 0
+
+    readonly property int animDist: 400 // Standard animation speed
+    property real animatedIncome: 0
+    property real animatedExpense: 0
+
+    // Transition smoothly when the actual totals change
+    Behavior on animatedIncome { NumberAnimation { duration: animDist; easing.type: Easing.OutCubic } }
+    Behavior on animatedExpense { NumberAnimation { duration: animDist; easing.type: Easing.OutCubic } }
+
+    // Sync animated properties to actual values
+    onTotalIncomeChanged: animatedIncome = totalIncome
+    onTotalExpenseChanged: animatedExpense = totalExpense
 
     // Determine Savings Rate color
     function getSavingsColor(rate) {
@@ -22,13 +35,14 @@ Rectangle {
         return "#4CAF50";                       // Green for great savings
     }
 
+    // Summary based on input
     function getSummaryText() {
-        if (totalIncome == 0 && totalExpense == 0) return "Enter your Income & Expenses";
+        if (totalIncome == 0 && totalExpense == 0) return "Enter your Monthly Income & Expenses";
         if (totalSurplus >= 0) return "Investable Surplus: " + root.currencySymbol + totalSurplus.toLocaleString(Qt.locale(), 'f', 0);
         if (totalSurplus < 0) return "Deficit: " + root.currencySymbol + totalSurplus.toLocaleString(Qt.locale(), 'f', 0);
     }
 
-    // quotes
+    // Quotes
     property var quotes: [
         { text: "Saving is the gap between your ego and your income.", author: ""},
         { text: "Beware of little expenses. A small leak will sink a great ship.", author: "— Benjamin Franklin" },
@@ -36,20 +50,70 @@ Rectangle {
         { text: "The secret to getting rich is not in making more money, but in keeping more of the money you make.", author: "— John D. Rockefeller" }
     ]
 
-    // Column to stack quote + cards
     ColumnLayout {
         anchors.fill: parent
         spacing: 10
-        anchors.margins: 20
+        anchors.margins: 15
 
-        // Clear Button
-        Button {
-            text: "Clear All"
-            flat: true
+        // Button Layout
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 40
             Layout.alignment: Qt.AlignHCenter
-            onClicked: {
-                income1.text = ''; income2.text = ''; income3.text = ''; income4.text = '';
-                expense1.text = ''; expense2.text = ''; expense3.text = ''; expense4.text = '';
+            spacing: 30
+
+            // ToDo: Save Button
+            Button {
+                id: saveBtn
+                text: "Save"
+                flat: true
+                Layout.alignment: Qt.AlignHCenter
+                palette.buttonText: "white"
+                hoverEnabled: true
+
+                onClicked: {
+                }
+
+                background: Rectangle {
+                    implicitWidth: 90
+                    implicitHeight: 32
+                    radius: 6
+                    color: saveBtn.hovered ? "#333" : "#222"
+
+                    // Smoothly transition the color change
+                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                    border.width: 1
+                    border.color: saveBtn.hovered ? "white" : "transparent"
+                }
+            }
+
+            // Clear Button
+            Button {
+                id: clearBtn
+                text: "Clear All"
+                flat: true
+                Layout.alignment: Qt.AlignHCenter
+                palette.buttonText: "white"
+                hoverEnabled: true
+
+                onClicked: {
+                    income1.text = ''; income2.text = ''; income3.text = ''; income4.text = '';
+                    expense1.text = ''; expense2.text = ''; expense3.text = ''; expense4.text = '';
+                }
+
+                background: Rectangle {
+                    implicitWidth: 90
+                    implicitHeight: 32
+                    radius: 6
+                    color: clearBtn.hovered ? "#333" : "#222"
+
+                    // Smoothly transition the color change
+                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                    border.width: 1
+                    border.color: clearBtn.hovered ? "white" : "transparent"
+                }
             }
         }
 
@@ -63,7 +127,7 @@ Rectangle {
             // 1. Income Card
             Rectangle {
                 id: incomeCard
-                color: "#1a2e1a"
+                color: "#1A2E1A"
                 Layout.fillWidth: true
                 Layout.preferredWidth: 1
                 Layout.fillHeight: true
@@ -108,7 +172,7 @@ Rectangle {
                             anchors.centerIn: parent
                             Text {
                                 text: "SAVINGS RATE"
-                                color: "#aaa"; font.pixelSize: 10; anchors.horizontalCenter: parent.horizontalCenter
+                                color: "#AAA"; font.pixelSize: 10; anchors.horizontalCenter: parent.horizontalCenter
                             }
                             Text {
                                 text: savingsRate.toFixed(1) + "%"
@@ -120,7 +184,7 @@ Rectangle {
 
                     // Total
                     Text {
-                        text: "Total Income: " + root.currencySymbol + totalIncome.toLocaleString(Qt.locale(), 'f', 0)
+                        text: "Total Income: " + root.currencySymbol + animatedIncome.toLocaleString(Qt.locale(), 'f', 0)
                         color: "#4CAF50"; font.pixelSize: 22; font.bold: true
                         Layout.alignment: Qt.AlignHCenter
                     }
@@ -146,6 +210,7 @@ Rectangle {
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 80
+                        Layout.bottomMargin: 20
                         spacing: 2
 
                         Text {
@@ -161,10 +226,20 @@ Rectangle {
                             color: "#666"; font.pixelSize: 10; Layout.alignment: Qt.AlignHCenter
                         }
 
+                        Rectangle { color: "silver"; Layout.fillWidth: true; implicitHeight: 1; Layout.topMargin: 10 }
+
                         Timer {
                             interval: 8000; running: true; repeat: true
                             onTriggered: currentQuoteIndex = (currentQuoteIndex + 1) % quotes.length
                         }
+                    }  
+
+                    Text {
+                        text: getSummaryText()
+                        color: (totalIncome === 0 && totalExpense === 0) ? "#C0C0C0" : getSavingsColor(savingsRate)
+                        font.pixelSize: 22
+                        font.bold: true
+                        Layout.alignment: Qt.AlignHCenter
                     }
 
                     Item {
@@ -176,13 +251,13 @@ Rectangle {
                             anchors.fill: parent
                             backgroundColor: "transparent"
                             legend.alignment: Qt.AlignBottom
-                            legend.labelColor: "white"
+                            legend.labelColor: "#AAAAAA"
                             antialiasing: true
 
                             PieSeries {
                                 id: pieSeries
-                                holeSize: 0.5
-                                size: 0.7
+                                holeSize: 0.35
+                                size: 0.6
 
                                 // Slice 1: Placeholder slice
                                 PieSlice {
@@ -195,6 +270,7 @@ Rectangle {
                                     color: "#333333" // Dark gray
                                     labelVisible: false
                                 }
+
                                 // Slice 2: Expenses
                                 PieSlice {
                                     label: "Expenses (" + (totalIncome > 0 ? ((totalExpense / totalIncome) * 100).toFixed(2) : "0.00") + "%) of Income"
@@ -204,7 +280,7 @@ Rectangle {
                                     }
                                     color: "#F44336" // Red
                                     labelVisible: value > 0
-                                    labelColor: "#aaaaaa"
+                                    labelColor: "#AAAAAA"
                                 }
 
                                 // Slice 3: Savings
@@ -218,44 +294,20 @@ Rectangle {
                                     }
                                     color: "#4CAF50" // Green
                                     labelVisible: value > 0
-                                    labelColor: "#aaaaaa"
-                                }
-                            }
-                        }
-
-                        // Value inside donut hole
-                        // Center Text inside donut hole
-                        Column {
-                            anchors.centerIn: parent
-                            spacing: -2 // Tighten the gap between label and value
-
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                font.pixelSize: 24
-                                font.bold: true
-                                // Reuse the color logic function we created earlier
-                                color: getSavingsColor(savingsRate)
-                                text: {
-                                    if (totalSurplus < 0) return "⚠️"
-                                    return savingsRate.toFixed(0) + "%"
+                                    labelColor: "#AAAAAA"
                                 }
                             }
                         }
                     }
 
                     Text {
-                        text: getSummaryText()
-                        color: (totalIncome === 0 && totalExpense === 0) ? "#C0C0C0" : (totalSurplus > 0 ? "#4CAF50" : "#F44336")
-                        font.pixelSize: 20
+                        visible: totalSurplus <= 0 && totalExpense > 0
+                        text: "Reduce expenses to start investing"
+                        color: "#2196F3"
+                        font.pixelSize: 17
                         font.bold: true
                         Layout.alignment: Qt.AlignHCenter
-                    }
-                    Text {
-                        visible: totalSurplus <= 0
-                        text: "Reduce expenses to start investing"
-                        color: "#666"
-                        font.pixelSize: 11
-                        Layout.alignment: Qt.AlignHCenter
+                        Layout.bottomMargin: 5
                     }
                 }
             }
@@ -263,7 +315,7 @@ Rectangle {
             // 3. Expense Card
             Rectangle {
                 id: expenseSheet
-                color: "#2e1a1a"
+                color: "#2E1A1A"
 
                 Layout.fillWidth: true
                 Layout.preferredWidth: 1
@@ -287,8 +339,8 @@ Rectangle {
 
                     // Inputs
                     InputRow { id: expense1; label: "Survival"; placeholder: "Rent, Bills, Groceries"; accentColor: "#F44336" }
-                    InputRow { id: expense2; label: "Lifestyle"; placeholder: "Shopping, Movies, Eating out"; accentColor: "#F44336" }
-                    InputRow { id: expense3; label: "Obligations"; placeholder: "EMIs, Loans, Insurance premiums"; accentColor: "#F44336" }
+                    InputRow { id: expense2; label: "Lifestyle"; placeholder: "Shopping, Movies, Dining"; accentColor: "#F44336" }
+                    InputRow { id: expense3; label: "Obligations"; placeholder: "EMIs, Loans, Insurance"; accentColor: "#F44336" }
                     InputRow { id: expense4; label: "Unplanned"; placeholder: "Other"; accentColor: "#F44336" }
 
                     // Spacer
@@ -297,6 +349,8 @@ Rectangle {
                     // Deficit Warning Box
                     Rectangle {
                         visible: totalSurplus < 0
+                        opacity: visible ? 1 : 0
+                        Behavior on opacity { NumberAnimation { duration: 250 } }
                         Layout.alignment: Qt.AlignHCenter
                         Layout.fillWidth: true
                         Layout.bottomMargin: 15
@@ -324,8 +378,8 @@ Rectangle {
                             }
 
                             Text {
-                                text: "Spending exceeds Earnings! Be more kanjoos... 🤷"
-                                color: "#ff8a80" // Lighter pinkish-red for better readability
+                                text: "Your Spendings exceed your Earnings!"
+                                color: "#FF8A80" // Lighter pinkish-red for better readability
                                 font.pixelSize: 11
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
@@ -334,7 +388,7 @@ Rectangle {
 
                     // Total
                     Text {
-                        text: "Total Expense: " + root.currencySymbol + totalExpense.toLocaleString(Qt.locale(), 'f', 0)
+                        text: "Total Expense: " + root.currencySymbol + animatedExpense.toLocaleString(Qt.locale(), 'f', 0)
                         color: "#F44336"; font.pixelSize: 22; font.bold: true
                         Layout.alignment: Qt.AlignHCenter
                     }
@@ -349,14 +403,17 @@ Rectangle {
         property string label: ""
         property string placeholder: ""
         property color accentColor: "#4CAF50" // Default to Green
+        property string symbol: root.currencySymbol
 
-        Text { text: label; color: "white"; Layout.preferredWidth: 80 }
+        Text { text: label; color: "#aaa"; font.pixelSize: 13; Layout.preferredWidth: 80 }
 
         TextField {
             id: input
             placeholderText: (placeholder == "") ? "0" : placeholder
             color: "white"
             Layout.fillWidth: true
+            leftPadding: 28
+
             inputMethodHints: Qt.ImhFormattedNumbersOnly // Opens number pad on mobile
 
             onTextEdited: {
@@ -371,12 +428,21 @@ Rectangle {
             validator: DoubleValidator { bottom: 0 }
 
             background: Rectangle {
-                color: "#333"
-                radius: 4
-                implicitHeight: 30
+                color: "#222"
+                radius: 8
+                implicitHeight: 35
                 // Change border color when the user clicks into the field
                 border.color: input.activeFocus ? accentColor : "transparent"
                 border.width: 1
+            }
+
+            Text {
+                text: symbol
+                color: "#666" // Muted gray so the white input text stands out
+                font.pixelSize: 14
+                anchors.left: parent.left
+                anchors.leftMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
             }
         }
     }
