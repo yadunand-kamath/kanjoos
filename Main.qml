@@ -16,6 +16,8 @@ Window {
     property string currencySymbol: "₹" // INR
     property real globalMonthlyIncome: cashflowPage.totalIncome
     property real globalMonthlyExpense: cashflowPage.totalExpense
+    property real insuranceTotalFromSafety: 0
+    property bool syncInsuranceToCashflow: false
 
     // ColumnLayout to stack items vertically
     ColumnLayout {
