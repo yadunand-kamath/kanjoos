@@ -94,24 +94,26 @@ Rectangle {
             id: disclaimerBanner
             Layout.fillWidth: true
             Layout.preferredHeight: 30
-            Layout.bottomMargin: -30
-            color: "#1a1a1a" // Subtle dark gray
-            border.color: "#333"
+            Layout.bottomMargin: -20
+            color: "#161616" // Subtle dark gray
+            border.color: "#222"
             border.width: 1
-            radius: 4
+            radius: 6
 
             Text {
                 anchors.centerIn: parent
                 // Constraint width so it wraps nicely on smaller windows
-                width: parent.width * 0.9
+                width: parent.width * 0.8
 
-                text: "⚠️ DISCLAIMER: All suggestions and recommendations are guidelines only. Please do your own due diligence before making any decision."
+                text: "⚠️ DISCLAIMER: All suggestions and recommendations are for guidance only. Please do your own due diligence before making any decision."
                 color: "#888"
-                font.pixelSize: 11
+                font.family: "Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+                font.pixelSize: 10
                 font.italic: true
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 wrapMode: Text.WordWrap
+                renderType: Text.NativeRendering
             }
         }
 
@@ -121,27 +123,60 @@ Rectangle {
             Layout.preferredHeight: 50
 
             // Sub-Navigation Tabs (Center)
-            Row {
+            Rectangle {
+                id: segmentedControl
                 anchors.centerIn: parent
-                spacing: 30
-                Repeater {
-                    model: ["Emergency Fund", "Insurance", "Retirement"]
-                    Button {
-                        text: modelData
-                        flat: true
-                        font.pixelSize: 15
-                        font.bold: safetyStack.currentIndex === index
-                        palette.buttonText: safetyStack.currentIndex === index ? "white" : "#555"
-                        onClicked: safetyStack.currentIndex = index
+                width: 420
+                height: 40
+                color: "#1E1E1E" // Dark gray background
+                radius: height / 2
+                border.color: "#2A2A2A"
+                border.width: 1
 
-                        // Small underline for active tab
-                        Rectangle {
-                            anchors.bottom: parent.bottom
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: parent.width * 0.6
-                            height: 2
-                            color: "#666"
-                            visible: safetyStack.currentIndex === index
+                // 1. THE SLIDING PILL (Active Tab Background)
+                Rectangle {
+                    id: activeHighlight
+                    width: (parent.width / 3) - 8 // Divide by 3 tabs, minus padding
+                    height: parent.height - 8
+                    x: (safetyStack.currentIndex * (parent.width / 3)) + 4
+                    y: 4
+                    color: "#333333" // Lighter "physical" toggle color
+                    radius: height / 2
+
+                    // Delight: Smooth sliding movement
+                    Behavior on x {
+                        NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
+                    }
+                }
+
+                // 2. THE LABELS
+                Row {
+                    anchors.fill: parent
+                    Repeater {
+                        model: ["Emergency Fund", "Insurance", "Retirement"]
+
+                        Item {
+                            width: segmentedControl.width / 3
+                            height: segmentedControl.height
+
+                            Text {
+                                text: modelData
+                                anchors.centerIn: parent
+                                font.pixelSize: 14
+                                font.weight: safetyStack.currentIndex === index ? Font.Medium : Font.Normal
+                                color: safetyStack.currentIndex === index ? "white" : "#777"
+                                font.bold: safetyStack.currentIndex === index ? true : false
+
+                                // Smooth color transition
+                                Behavior on color { ColorAnimation { duration: 200 } }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: safetyStack.currentIndex = index
+                                cursorShape: Qt.PointingHandCursor
+                            }
                         }
                     }
                 }
@@ -661,21 +696,21 @@ Rectangle {
                             Text {
                                 visible: currentCardIndex === 0 && !corporateCheck.checked
                                 text: "Ensure parents & children are included"
-                                color: "blue"; font.pixelSize: 14; font.bold: true
+                                color: "#2196F3"; font.pixelSize: 14; font.bold: true
                                 Layout.alignment: Qt.AlignHCenter
                             }
 
                             Text {
                                 visible: currentCardIndex === 1
                                 text: "Choose pure Term plans only. Avoid ULIPs."
-                                color: "blue"; font.pixelSize: 14; font.bold: true
+                                color: "#2196F3"; font.pixelSize: 14; font.bold: true
                                 Layout.alignment: Qt.AlignHCenter
                             }
 
                             Text {
                                 visible: currentCardIndex === 2
                                 text: "Don't over-insure depreciating assets"
-                                color: "blue"; font.pixelSize: 14; font.bold: true
+                                color: "#2196F3"; font.pixelSize: 14; font.bold: true
                                 Layout.alignment: Qt.AlignHCenter
                             }
 
