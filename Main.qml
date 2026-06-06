@@ -34,27 +34,46 @@ Window {
         TabBar {
             id: navBar
             Layout.fillWidth: true
+            spacing: 0
 
             // Override the background of the TabBar
             background: Rectangle {
-                color: "#1a1a1a" // Dark grey, slightly lighter than the title bar
+                color: "#000000" // Dark grey, slightly lighter than the title bar
             }
 
-            TabButton {
-                text: qsTr("Overview")
+            // Custom helper for styled buttons
+            component NavButton : TabButton {
+                id: tab
+
+                contentItem: Text {
+                    text: tab.text
+                    font.pixelSize: 12
+                    font.weight: tab.checked ? Font.DemiBold : Font.Normal
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    // Active: Black text | Inactive: Silver text
+                    color: tab.checked ? "#000000" : "#C0C0C0"
+
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                }
+
+                background: Rectangle {
+                    // Active: White background | Inactive: Muted gray background
+                    color: tab.checked ? "#FFFFFF" : "#1A1A1A"
+
+                    // Add a subtle border to separate inactive tabs
+                    border.color: "#000000"
+                    border.width: 1
+
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                }
             }
-            TabButton {
-                text: qsTr("Cash Flow")
-            }
-            TabButton {
-                text: qsTr("Safety net")
-            }
-            TabButton {
-                text: qsTr("SIP Planner")
-            }
-            TabButton {
-                text: qsTr("Portfolio")
-            }
+
+            NavButton { text: qsTr("Overview") }
+            NavButton { text: qsTr("Cash Flow") }
+            NavButton { text: qsTr("Safety net") }
+            NavButton { text: qsTr("SIP Planner") }
+            NavButton { text: qsTr("Portfolio") }
         }
 
         // 3. Content Pages

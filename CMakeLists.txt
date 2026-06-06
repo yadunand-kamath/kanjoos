@@ -4,12 +4,19 @@ project(kanjoos VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_AUTOMOC ON)
+
 find_package(Qt6 REQUIRED COMPONENTS Quick Core Gui Qml Charts Widgets QuickControls2)
 
 qt_standard_project_setup(REQUIRES 6.10)
 
 qt_add_executable(appkanjoos
     main.cpp
+    cpp/RetirementCalculator.h
+    cpp/RetirementAssetModel.h
+    cpp/RetirementCalculator.cpp
+    cpp/InsuranceCalculator.h
+    cpp/InsuranceCalculator.cpp
 )
 
 qt_add_qml_module(appkanjoos
@@ -22,6 +29,12 @@ qt_add_qml_module(appkanjoos
         qml/page/Planning.qml
         qml/page/Portfolio.qml
         qml/page/SafetyNet.qml
+        qml/page/subpage/EmergencyFund.qml
+        qml/page/subpage/InsuranceTracker.qml
+        qml/page/subpage/Retirement.qml
+        qml/components/CustomSlider.qml
+        qml/components/SaveButton.qml
+        qml/components/ClearButton.qml
     RESOURCES
         assets/fonts/BJCree-Bold.ttf
 )

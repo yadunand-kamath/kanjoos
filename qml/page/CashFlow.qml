@@ -3,13 +3,20 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtCharts
 
+import "../components"
+
 Rectangle {
     id: cashflowRoot
     color: "#121212"
 
     // properies
     readonly property real totalIncome: Number(income1.text) + Number(income2.text) + Number(income3.text) + Number(income4.text)
-    readonly property real totalExpense: Number(expense1.text) + Number(expense2.text) + Number(expense3.text) + Number(expense4.text)
+    readonly property real totalExpense: {
+        let manualExpenses = Number(expense1.text) + Number(expense2.text) + Number(expense3.text) + Number(expense4.text);
+        // Add synced amount only if global flag is true
+        let syncedAddon = root.syncInsuranceToCashflow ? root.insuranceTotalFromSafety : 0;
+        return manualExpenses + syncedAddon;
+    }
     readonly property real totalSurplus: totalIncome - totalExpense
     readonly property real savingsRate: totalIncome > 0 ? (totalSurplus / totalIncome) * 100 : 0
 
@@ -54,68 +61,6 @@ Rectangle {
         anchors.fill: parent
         spacing: 10
         anchors.margins: 15
-
-        // Button Layout
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 40
-            Layout.alignment: Qt.AlignHCenter
-            spacing: 30
-
-            // ToDo: Save Button
-            Button {
-                id: saveBtn
-                text: "Save"
-                flat: true
-                Layout.alignment: Qt.AlignHCenter
-                palette.buttonText: "white"
-                hoverEnabled: true
-
-                onClicked: {
-                }
-
-                background: Rectangle {
-                    implicitWidth: 90
-                    implicitHeight: 32
-                    radius: 6
-                    color: saveBtn.hovered ? "#333" : "#222"
-
-                    // Smoothly transition the color change
-                    Behavior on color { ColorAnimation { duration: 150 } }
-
-                    border.width: 1
-                    border.color: saveBtn.hovered ? "white" : "transparent"
-                }
-            }
-
-            // Clear Button
-            Button {
-                id: clearBtn
-                text: "Clear All"
-                flat: true
-                Layout.alignment: Qt.AlignHCenter
-                palette.buttonText: "white"
-                hoverEnabled: true
-
-                onClicked: {
-                    income1.text = ''; income2.text = ''; income3.text = ''; income4.text = '';
-                    expense1.text = ''; expense2.text = ''; expense3.text = ''; expense4.text = '';
-                }
-
-                background: Rectangle {
-                    implicitWidth: 90
-                    implicitHeight: 32
-                    radius: 6
-                    color: clearBtn.hovered ? "#333" : "#222"
-
-                    // Smoothly transition the color change
-                    Behavior on color { ColorAnimation { duration: 150 } }
-
-                    border.width: 1
-                    border.color: clearBtn.hovered ? "white" : "transparent"
-                }
-            }
-        }
 
         // Cards Arrangement
         RowLayout {
@@ -343,6 +288,42 @@ Rectangle {
                     InputRow { id: expense3; label: "Obligations"; placeholder: "EMIs, Loans, Insurance"; accentColor: "#F44336" }
                     InputRow { id: expense4; label: "Unplanned"; placeholder: "Other"; accentColor: "#F44336" }
 
+                    // SYNCED INSURANCE INFO BOX
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 32
+                        Layout.topMargin: 5
+                        Layout.bottomMargin: 5
+                        color: "#1a00e5ff" // Subtle Cyan background
+                        radius: 6
+                        border.color: "#00E5FF"
+                        border.width: 1
+                        visible: root.syncInsuranceToCashflow && root.insuranceTotalFromSafety > 0
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12; anchors.rightMargin: 12
+
+                            Text {
+                                text: "🛡️ " + root.currencySymbol + root.insuranceTotalFromSafety.toLocaleString(Qt.locale(), 'f', 0)
+                                color: "#00E5FF"
+                                font.pixelSize: 11
+                                font.bold: true
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            Text {
+                                text: "Synced from Insurance"
+                                color: "#00E5FF"
+                                font.pixelSize: 10
+                                font.italic: true
+                                opacity: 0.8
+                            }
+                        }
+                    }
+
                     // Spacer
                     Item { Layout.fillHeight: true }
 
@@ -394,6 +375,18 @@ Rectangle {
                     }
                 }
             }
+        }
+
+        // Button Layout
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 40
+            Layout.alignment: Qt.AlignHCenter
+            spacing: 30
+
+            SaveButton { id: saveButton }
+
+            ClearButton { id: clearButton }
         }
     }
 

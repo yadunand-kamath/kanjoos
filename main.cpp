@@ -1,6 +1,11 @@
 #include <QApplication>
 #include <QQmlApplicationEngine>
+#include <QQmlContext>
 #include <QQuickStyle>
+
+#include "cpp/InsuranceCalculator.h"
+#include "cpp/RetirementAssetModel.h"
+#include "cpp/RetirementCalculator.h"
 
 int main(int argc, char *argv[])
 {
@@ -9,6 +14,16 @@ int main(int argc, char *argv[])
     QQuickStyle::setStyle("Basic");
 
     QQmlApplicationEngine engine;
+
+    InsuranceCalculator insuranceCalc;
+    engine.rootContext()->setContextProperty("insuranceCalc", &insuranceCalc);
+
+    RetirementCalculator retirementCalc;
+    RetirementAssetModel retirementAssetModel;
+
+    engine.rootContext()->setContextProperty("retirementCalc", &retirementCalc);
+    engine.rootContext()->setContextProperty("retirementAssetModel", &retirementAssetModel);
+
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,
