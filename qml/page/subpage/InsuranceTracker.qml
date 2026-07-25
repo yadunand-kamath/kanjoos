@@ -17,6 +17,10 @@ Item {
     property int healthFreq: 0
     property int lifeFreq: 0
 
+    // Per-card Policy Vault storage (Health vs Life are tracked separately)
+    property var healthPolicyVault: ({ policyNumber: "", nominee: "", tpaContact: "", docLocation: "" })
+    property var lifePolicyVault: ({ policyNumber: "", nominee: "", tpaContact: "", docLocation: "" })
+
     readonly property real totalInsurancePremium: {
         if (!healthPremiumField || !lifePremiumField || !assetModel) return 0;
 
@@ -33,6 +37,21 @@ Item {
     }
 
     onTotalInsurancePremiumChanged: { root.insuranceTotalFromSafety = totalInsurancePremium }
+
+    readonly property real totalSumInsured: {
+        if (!healthCover || !lifeCover || !assetModel) return 0;
+
+        let healthInput = parseFloat(healthCover.text) || 0;
+        let lifeInput = hasDependents ? (parseFloat(lifeCover.text) || 0) : 0;
+
+        let assetInput = 0;
+        for (let i = 0; i < assetModel.count; i++) {
+            assetInput += parseFloat(assetModel.get(i).cover) || 0;
+        }
+        return healthInput + lifeInput + assetInput;
+    }
+
+    readonly property real lifeCoverGap: isReady && hasDependents ? (insuranceCalc.recommendedLifeCover - (parseFloat(lifeCover ? lifeCover.text : "0") || 0)) : 0
 
     ListModel {
         id: assetModel
@@ -123,7 +142,7 @@ Item {
                             onFreqChanged: (idx) => healthFreq = idx
                         }
 
-                        PolicyVaultButton { accent: "#00E5FF"; onClicked: policyPopup.open() }
+                        PolicyVaultButton { accent: "#00E5FF"; onClicked: policyPopup.openFor("health") }
 
                         Item { Layout.fillHeight: true }
                         Text { text: "RECOMMENDED COVER: 10-15x Monthly Expenses"; color: "#2196F3"; font.pixelSize: 11; font.bold: true; Layout.alignment: Qt.AlignHCenter }
@@ -185,6 +204,15 @@ Item {
 
                         InsuranceInput { id: lifeCover; label: "Term Cover"; symbol: root.currencySymbol; enabled: hasDependents; borderColor: "#FFC400" }
 
+                        Text {
+                            visible: hasDependents && lifeCover.text !== ""
+                            text: lifeCoverGap > 0
+                                  ? "Shortfall: " + root.currencySymbol + (lifeCoverGap/10000000).toFixed(2) + " Cr"
+                                  : "Fully Covered ✓"
+                            color: lifeCoverGap > 0 ? "#FF0000" : "#43e97b"
+                            font.pixelSize: 11; font.bold: true
+                        }
+
                         FrequencyPremiumInput {
                             label: "Premium Amount"
                             fieldId: "lifePremiumField"
@@ -192,13 +220,21 @@ Item {
                             onFreqChanged: (idx) => lifeFreq = idx
                         }
 
-                        PolicyVaultButton { accent: "#FFC400"; onClicked: policyPopup.open() }
+                        PolicyVaultButton { accent: "#FFC400"; onClicked: policyPopup.openFor("life") }
 
                         Item { Layout.fillHeight: true }
                         Text {
                             text: "RECOMMENDED COVER: " + root.currencySymbol +
                                   (isReady ? (insuranceCalc.recommendedLifeCover/10000000).toFixed(2) : "0.00") + " Cr"
                             color: "#2196F3"; font.pixelSize: 11; font.bold: true; Layout.alignment: Qt.AlignHCenter
+                        }
+                        Text {
+                            visible: isReady
+                            text: insuranceCalc.lifeCoverDirective
+                            color: "#666"; font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                            Layout.fillWidth: true
+                            horizontalAlignment: Text.AlignHCenter
                         }
                     }
                 }
@@ -237,14 +273,7 @@ Item {
                                                 placeholderText: "House/Car"; text: model.name; Layout.fillWidth: true
                                                 color: "white"; font.pixelSize: 13
                                                 background: Rectangle { color: "#111"; radius: 6; implicitHeight: 36; border.color: "#2A2A2A" }
-                                                validator: DoubleValidator { bottom: 0 }
-                                                // Clean leading zeros
-                                                onTextEdited: {
-                                                    if (text.length > 1 && text.startsWith("0") && !text.startsWith("0.")) {
-                                                        text = text.replace(/^0+/, '');
-                                                    }
-                                                    assetModel.setProperty(rowIdx, "name", text)
-                                                }
+                                                onTextEdited: assetModel.setProperty(rowIdx, "name", text)
                                             }
                                         }
 
@@ -317,6 +346,26 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
                 palette.buttonText: "#444"
                 onClicked: currentCardIndex = (currentCardIndex < 2) ? currentCardIndex + 1 : 0
+            }
+        }
+
+        // CAROUSEL PAGE INDICATOR
+        Row {
+            Layout.alignment: Qt.AlignHCenter
+            spacing: 8
+
+            Repeater {
+                model: 3
+                Rectangle {
+                    readonly property bool active: currentCardIndex === index
+                    width: active ? 22 : 8; height: 8; radius: 4
+                    color: active ? "#FFFFFF" : "#444"
+
+                    Behavior on width { NumberAnimation { duration: 200 } }
+                    Behavior on color { ColorAnimation { duration: 200 } }
+
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: currentCardIndex = index }
+                }
             }
         }
 
@@ -400,6 +449,12 @@ Item {
                 Item { Layout.fillWidth: true }
                 Column {
                     Layout.alignment: Qt.AlignRight
+                    Text { text: "TOTAL SUM INSURED"; color: "#888"; font.pixelSize: 9; Layout.alignment: Qt.AlignRight }
+                    Text { text: root.currencySymbol + " " + totalSumInsured.toLocaleString(Qt.locale(), 'f', 0); color: "#AAA"; font.pixelSize: 16; font.bold: true; Layout.alignment: Qt.AlignRight }
+                }
+                Item { Layout.preferredWidth: 30 }
+                Column {
+                    Layout.alignment: Qt.AlignRight
                     Text { text: "TOTAL MONTHLY PREMIUM"; color: "#888"; font.pixelSize: 9; Layout.alignment: Qt.AlignRight }
                     Text { text: root.currencySymbol + " " + totalInsurancePremium.toLocaleString(Qt.locale(), 'f', 0); color: "white"; font.pixelSize: 22; font.bold: true }
                 }
@@ -420,6 +475,28 @@ Item {
         Overlay.modal: Rectangle { color: "#80000000" }
         background: Rectangle { color: "#121212"; border.color: "#2A2A2A"; radius: 16 }
 
+        property string activeCard: "health"
+        readonly property color activeAccent: activeCard === "health" ? "#00E5FF" : "#FFC400"
+
+        function openFor(cardKey) {
+            activeCard = cardKey;
+            let data = cardKey === "health" ? healthPolicyVault : lifePolicyVault;
+            policyNumberField.text = data.policyNumber;
+            nomineeField.text = data.nominee;
+            tpaField.text = data.tpaContact;
+            docField.text = data.docLocation;
+            open();
+        }
+
+        function save() {
+            let data = activeCard === "health" ? healthPolicyVault : lifePolicyVault;
+            data.policyNumber = policyNumberField.text;
+            data.nominee = nomineeField.text;
+            data.tpaContact = tpaField.text;
+            data.docLocation = docField.text;
+            close();
+        }
+
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 25
@@ -427,7 +504,7 @@ Item {
 
             // CENTERED HEADING
             Text {
-                text: "📄 Policy Vault"
+                text: (policyPopup.activeCard === "health" ? "🏥 Health" : "❤ Life") + " Policy Vault"
                 color: "white"
                 font.pixelSize: 18
                 font.bold: true
@@ -448,21 +525,25 @@ Item {
                     spacing: 15
 
                     VaultField {
+                        id: policyNumberField
                         label: "POLICY NUMBER"
                         placeholder: "e.g. HDFC-12345"
                         Layout.fillWidth: true
                     }
                     VaultField {
+                        id: nomineeField
                         label: "NOMINEE NAME"
                         placeholder: "e.g. Spouse / Parent"
                         Layout.fillWidth: true
                     }
                     VaultField {
+                        id: tpaField
                         label: "TPA / CLAIM CONTACT"
                         placeholder: "1800-XXX-XXXX"
                         Layout.fillWidth: true
                     }
                     VaultField {
+                        id: docField
                         label: "DOCUMENT LOCATION"
                         placeholder: "e.g. Black folder, cupboard"
                         Layout.fillWidth: true
@@ -473,9 +554,9 @@ Item {
             Button {
                 text: "Save & Close"
                 Layout.fillWidth: true
-                onClicked: policyPopup.close()
+                onClicked: policyPopup.save()
                 background: Rectangle {
-                    color: "#00E5FF" // Medical Cyan
+                    color: policyPopup.activeAccent
                     radius: 8
                     implicitHeight: 40
                 }
@@ -657,9 +738,11 @@ Item {
 
     component VaultField : ColumnLayout {
         property string label: ""; property string placeholder: ""
+        property alias text: field.text
         spacing: 4
         Text { text: label; color: "#757575"; font.pixelSize: 9; font.letterSpacing: 1 }
         TextField {
+            id: field
             Layout.fillWidth: true; placeholderText: placeholder; color: "white"
             background: Rectangle { color: "#000"; border.color: "#2A2A2A"; radius: 6; implicitHeight: 36 }
         }

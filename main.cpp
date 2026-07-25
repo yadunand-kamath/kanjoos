@@ -3,9 +3,12 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 
+#include "cpp/GoalModel.h"
 #include "cpp/InsuranceCalculator.h"
 #include "cpp/RetirementAssetModel.h"
 #include "cpp/RetirementCalculator.h"
+#include "cpp/SipFilterProxy.h"
+#include "cpp/UnifiedSipModel.h"
 
 int main(int argc, char *argv[])
 {
@@ -15,14 +18,28 @@ int main(int argc, char *argv[])
 
     QQmlApplicationEngine engine;
 
-    InsuranceCalculator insuranceCalc;
-    engine.rootContext()->setContextProperty("insuranceCalc", &insuranceCalc);
+    InsuranceCalculator *insuranceCalc = new InsuranceCalculator(&app);
+    engine.rootContext()->setContextProperty("insuranceCalc", insuranceCalc);
 
-    RetirementCalculator retirementCalc;
-    RetirementAssetModel retirementAssetModel;
+    RetirementCalculator *retirementCalc = new RetirementCalculator(&app);
+    engine.rootContext()->setContextProperty("retirementCalc", retirementCalc);
 
-    engine.rootContext()->setContextProperty("retirementCalc", &retirementCalc);
-    engine.rootContext()->setContextProperty("retirementAssetModel", &retirementAssetModel);
+    RetirementAssetModel *retirementAssetModel = new RetirementAssetModel(&app);
+    engine.rootContext()->setContextProperty("retirementAssetModel", retirementAssetModel);
+
+    UnifiedSipModel *unifiedSipModel = new UnifiedSipModel(&app);
+    GoalModel *goalModel = new GoalModel(&app);
+
+    // Give GoalModel the pointer to the SIP data
+    goalModel->setSipModel(unifiedSipModel);
+    // Connect the signal so GoalModel refreshes whenever SIP data changes
+    QObject::connect(unifiedSipModel, &UnifiedSipModel::sipUpdated, goalModel, &GoalModel::handleSipUpdate);
+
+    engine.rootContext()->setContextProperty("unifiedSipModel", unifiedSipModel);
+    engine.rootContext()->setContextProperty("goalModel", goalModel);
+
+    // Arguments: (Plugin Name, Major Version, Minor Version, QML Type Name)
+    qmlRegisterType<SipFilterProxy>("FinancialComponents", 1, 0, "SipFilterProxy");
 
     QObject::connect(
         &engine,

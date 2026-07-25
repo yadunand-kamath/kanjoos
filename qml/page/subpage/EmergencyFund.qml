@@ -28,7 +28,7 @@ Item {
         // Savings Input
         ColumnLayout {
             Layout.alignment: Qt.AlignHCenter
-            Layout.topMargin: 30
+            Layout.topMargin: 15
             spacing: 10
 
             Text { text: "HOW MUCH DO YOU HAVE SAVED TODAY?"; color: "#888"; font.pixelSize: 11; font.letterSpacing: 1; Layout.alignment: Qt.AlignHCenter }
@@ -79,16 +79,29 @@ Item {
                     font.bold: true
                     visible: false
                 }
+
+                // Real ink bounds of the glyphs (excludes the empty ascender/descender
+                // padding baked into the font's line height). Without this, the fill
+                // has to "use up" that empty margin before any ink is revealed at the
+                // bottom, and finishes revealing all the ink well before reaching the
+                // top of the box - which is why it looked full above ~75% and empty
+                // below ~20% instead of matching the real percentage.
+                FontMetrics { id: heroFontMetrics; font: dummyText.font }
+                readonly property rect inkRect: heroFontMetrics.tightBoundingRect(dummyText.text)
+                readonly property real inkBottomMargin: dummyText.height - (heroFontMetrics.ascent + inkRect.y + inkRect.height)
+                readonly property real fillHeight: Math.max(0, Math.min(dummyText.height,
+                    inkBottomMargin + progress * inkRect.height))
+
                 // Base Layer: Dull Gray (Empty State)
                 Text {
                     text: dummyText.text
                     font: dummyText.font
                     color: (progress * 100 < 0.1) ? "#990000" : "#7D7D7D" // Dull gray for the "empty" part
                 }
-                // Fill Layer: Green (Controlled by progress)
+                // Fill Layer: Green (Controlled by progress, mapped to actual glyph ink)
                 Item {
                     width: parent.width
-                    height: parent.height * progress // Height grows based on %
+                    height: heroContainer.fillHeight
                     anchors.bottom: parent.bottom
                     clip: true // This creates the "fill" look
 
@@ -244,7 +257,11 @@ Item {
 
                 SaveButton { id: saveButton }
 
-                ClearButton { id: clearButton }
+                ClearButton {
+                    id: clearButton
+                    text: "Clear"
+                    onClicked: savingsInput.text = ''
+                }
             }
         }
     }

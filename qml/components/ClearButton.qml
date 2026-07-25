@@ -10,11 +10,6 @@ Button {
     palette.buttonText: "white"
     hoverEnabled: true
 
-    onClicked: {
-        income1.text = ''; income2.text = ''; income3.text = ''; income4.text = '';
-        expense1.text = ''; expense2.text = ''; expense3.text = ''; expense4.text = '';
-    }
-
     background: Rectangle {
         implicitWidth: 90
         implicitHeight: 32
