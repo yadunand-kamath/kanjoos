@@ -21,7 +21,9 @@ class InsuranceCalculator : public QObject {
 public:
     explicit InsuranceCalculator(QObject *parent = nullptr) : QObject(parent),
         m_hasDependents(true), m_annualExpenses(600000), m_totalLoans(0),
-        m_futureMilestones(0), m_currentLiquidAssets(0), m_multiplier(15) {}
+        m_futureMilestones(0), m_currentLiquidAssets(0), m_multiplier(15) {
+        calculate();
+    }
 
     // Getters
     bool hasDependents() const { return m_hasDependents; }

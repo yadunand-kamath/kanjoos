@@ -81,6 +81,8 @@ Window {
             id: mainContent
             Layout.fillWidth: true
             Layout.fillHeight: true
+            clip: true
+            Layout.preferredHeight: 1
 
             // Co-ordinate with TabBar
             currentIndex: navBar.currentIndex
@@ -95,7 +97,7 @@ Window {
             Overview { id: overviewPage }
             CashFlow { id: cashflowPage }
             SafetyNet { id: safetynetPage }
-            Planning { id: sipPage }
+            Planner { id: sipPage }
             Portfolio { id: portfolioPage }
         }
     }

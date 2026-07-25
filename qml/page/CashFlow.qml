@@ -44,9 +44,12 @@ Rectangle {
 
     // Summary based on input
     function getSummaryText() {
-        if (totalIncome == 0 && totalExpense == 0) return "Enter your Monthly Income & Expenses";
-        if (totalSurplus >= 0) return "Investable Surplus: " + root.currencySymbol + totalSurplus.toLocaleString(Qt.locale(), 'f', 0);
-        if (totalSurplus < 0) return "Deficit: " + root.currencySymbol + totalSurplus.toLocaleString(Qt.locale(), 'f', 0);
+        if (totalIncome == 0 && totalExpense == 0)
+            return "Enter your Monthly Income & Expenses";
+        if (totalSurplus >= 0)
+            return "Investable Surplus: " + root.currencySymbol + totalSurplus.toLocaleString(Qt.locale(), 'f', 0);
+        else
+            return "Deficit: " + root.currencySymbol + totalSurplus.toLocaleString(Qt.locale(), 'f', 0);
     }
 
     // Quotes
@@ -386,7 +389,14 @@ Rectangle {
 
             SaveButton { id: saveButton }
 
-            ClearButton { id: clearButton }
+            ClearButton {
+                id: clearButton
+
+                onClicked: {
+                    income1.text = ''; income2.text = ''; income3.text = ''; income4.text = '';
+                    expense1.text = ''; expense2.text = ''; expense3.text = ''; expense4.text = '';
+                }
+            }
         }
     }
 

@@ -96,7 +96,7 @@ Rectangle {
                 id: segmentedControl
                 anchors.centerIn: parent
                 width: 420
-                height: 40
+                height: 30
                 color: "#1E1E1E" // Dark gray background
                 radius: height / 2
                 border.color: "#2A2A2A"
