@@ -13,7 +13,7 @@ Item {
     // Proxy model per page
     SipFilterProxy {
         id: pageProxy
-        sourceModel: unifiedSipModel
+        sourceModel: sipModel
         filterType: sipTableRoot.filterType
     }
 
@@ -169,21 +169,29 @@ Item {
 
                     CustomComboBox {
                         Layout.preferredWidth: colGoal
-                        model: goalModel
-                        textRole: "goalName"
-                        currentIndex: find(goalLink)
-                        onActivated: goalLink = currentText
+                        model: goalModel.goalNamesWithNone
+
+                        // Set index: find the current goalLink in the list of names
+                        currentIndex: find(model.goalLink)
+
+                        onActivated: {
+                            // If "- None -" is picked, we store it as an empty string to "unselect"
+                            model.goalLink = (currentText === "- None -") ? "" : currentText
+                        }
                     }
 
                     // SIP Value
                     TextInput {
-                        text: model.amount
+                        text: model.amount === 0 ? "" : model.amount.toString()
                         color: accent
                         font.bold: true; font.family: "Monospace"; font.pixelSize: 13
                         Layout.preferredWidth: colSIP; horizontalAlignment: Text.AlignRight
                         Layout.alignment: Qt.AlignVCenter
                         validator: DoubleValidator { bottom: 0 }
-                        onTextEdited: model.amount = parseFloat(text)
+                        onTextEdited: {
+                            let val = parseFloat(text)
+                            model.amount = isNaN(val) ? 0 : val
+                        }
                     }
 
                     // Delete Button

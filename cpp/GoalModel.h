@@ -6,7 +6,8 @@
 #include <cmath>
 #include <QDebug>
 
-#include "UnifiedSipModel.h"
+#include "SipModel.h"
+#include "PortfolioModel.h"
 
 struct GoalItem {
     int priority;
@@ -27,6 +28,7 @@ class GoalModel : public QAbstractListModel {
     Q_PROPERTY(double longRet  MEMBER m_longRet  NOTIFY settingsChanged)
     Q_PROPERTY(double totalRequiredSIP READ totalRequiredSIP NOTIFY totalsChanged)
     Q_PROPERTY(double coverageRatio READ coverageRatio NOTIFY totalsChanged)
+    Q_PROPERTY(QStringList goalNamesWithNone READ goalNamesWithNone NOTIFY goalNamesChanged)
 
 public:
     enum Roles {
@@ -51,6 +53,10 @@ public:
         m_data << GoalItem{1, "Emergency Fund", 1, 500000.0, 50000.0};
         m_data << GoalItem{2, "Retirement", 25, 2000000.0, 0.0};
 
+        // Dummy data
+        m_data << GoalItem{3, "Home Downpayment", 5, 2500000.0, 0.0};
+        m_data << GoalItem{4, "World Tour", 3, 1000000.0, 0.0};
+
         updateTotals();
     }
 
@@ -73,14 +79,15 @@ public:
 
         // Perform Calculations
         double futureTarget = (item.yearsLeft <= 0) ? item.currentCost : item.currentCost * std::pow(1.0 + (inf/100.0), item.yearsLeft);
-        double reqSIP = (item.yearsLeft <= 0) ? 0 : calculateRequiredSIP(item, futureTarget, ret);
+        double liveFunded = m_portfolioModel ? m_portfolioModel->getFundedAmountForGoal(item.goalName) : 0.0;
+        double reqSIP = (item.yearsLeft <= 0) ? 0 : calculateRequiredSIP(item, futureTarget, ret, liveFunded);
 
         switch (role) {
         case PriorityRole:      return item.priority;
         case GoalNameRole:      return item.goalName;
         case YearsLeftRole:     return item.yearsLeft;
         case CurrentCostRole:   return item.currentCost;
-        case CurrentFundedRole: return item.currentFunded;
+        case CurrentFundedRole: return liveFunded;
         case FutureTargetRole:  return futureTarget;
         case ActualSIPRole:     return m_sipModel ? m_sipModel->getGoalSum(item.goalName) : 0.0;
         case RequiredSIPRole:   return reqSIP;
@@ -132,19 +139,20 @@ public:
 
         switch (role) {
         case GoalNameRole: // Block renaming for both protected goals
-            if (item.goalName != "Emergency Fund" && item.goalName != "Retirement") {
+            if (item.goalName != value.toString() && item.goalName != "Emergency Fund" && item.goalName != "Retirement") {
                 item.goalName = value.toString();
                 changed = true;
+                emit goalNamesChanged();
             }
             break;
         case YearsLeftRole:   item.yearsLeft = value.toInt(); changed = true; break;
         case CurrentCostRole: item.currentCost = value.toDouble(); changed = true; break;
-        case CurrentFundedRole: item.currentFunded = value.toDouble(); changed = true; break;
+        // case CurrentFundedRole: item.currentFunded = value.toDouble(); changed = true; break; - This is now automated by Portfolio
         }
 
         if (changed) {
             // Signal refresh for the row and all calculated columns
-            emit dataChanged(index, index, {role, FutureTargetRole, RequiredSIPRole, HorizonRole});
+            emit dataChanged(index, index, {role, FutureTargetRole, RequiredSIPRole, HorizonRole, ActualSIPRole, CurrentFundedRole});
             updateTotals();
             return true;
         }
@@ -181,6 +189,7 @@ public:
         m_data << GoalItem{newIndex + 1, "New Goal", 10, 100000.0, 0.0};
         endInsertRows();
         updateTotals();
+        emit goalNamesChanged();
     }
 
     Q_INVOKABLE void removeGoal(int index) {
@@ -196,6 +205,34 @@ public:
         for(int i = 0; i < m_data.size(); ++i) m_data[i].priority = i + 1;
         endRemoveRows();
         updateTotals();
+        emit goalNamesChanged();
+    }
+
+    Q_INVOKABLE double getGoalCoverage(const QString &goalName) const {
+        for (const auto &item : std::as_const(m_data)) {
+            if (item.goalName == goalName) {
+                // Calculate required for this specific item (reuse your horizon logic)
+                double rate = (item.yearsLeft < 2) ? m_shortRet : (item.yearsLeft < 5) ? m_medRet : m_longRet;
+                double inf = (item.yearsLeft < 2) ? m_shortInf : (item.yearsLeft < 5) ? m_medInf : m_longInf;
+                double fv = item.currentCost * std::pow(1.0 + (inf/100.0), item.yearsLeft);
+
+                double liveFunded = m_portfolioModel ? m_portfolioModel->getFundedAmountForGoal(item.goalName) : 0.0;
+                double required = calculateRequiredSIP(item, fv, rate, liveFunded);
+
+                // Get actual from SIP model
+                double actual = m_sipModel ? m_sipModel->getGoalSum(item.goalName) : 0.0;
+
+                // If we don't need any more money (required is 0), coverage is 100%
+                if (required <= 0) return 1.0;
+
+                // Otherwise, ratio of what we are doing vs what we need to do
+                double ratio = actual / required;
+
+                // Clamp between 0.0 and 1.0 so the bar doesn't overflow
+                return std::min(1.0, std::max(0.0, ratio));
+            }
+        }
+        return 0.0; // Goal not found
     }
 
     double totalRequiredSIP() const { return m_totalRequiredSIP; }
@@ -203,73 +240,91 @@ public:
     double coverageRatio() const { return m_coverageRatio; }
 
     void updateTotals() {
-        // Safety check: if model is empty, reset totals and exit
         if (m_data.isEmpty()) {
             m_totalRequiredSIP = 0;
             m_coverageRatio = 0;
             emit totalsChanged();
             return;
         }
+
         double sumRequired = 0;
         double sumActual = 0;
 
         for (const auto &item : std::as_const(m_data)) {
-            // Re-run the same logic used in data() to find the horizon rate
-            double rate = (item.yearsLeft < 2) ? m_shortRet :
-                              (item.yearsLeft < 5) ? m_medRet : m_longRet;
-
-            double inf = (item.yearsLeft < 2) ? m_shortInf :
-                             (item.yearsLeft < 5) ? m_medInf : m_longInf;
-
+            // Horizon logic
+            double rate = (item.yearsLeft < 2) ? m_shortRet : (item.yearsLeft < 5) ? m_medRet : m_longRet;
+            double inf = (item.yearsLeft < 2) ? m_shortInf : (item.yearsLeft < 5) ? m_medInf : m_longInf;
             double fv = item.currentCost * std::pow(1.0 + (inf/100.0), item.yearsLeft);
 
-            sumRequired += calculateRequiredSIP(item, fv, rate);
+            // 1. SAFE POINTER CHECK: Fetch live funded amount from Portfolio
+            double liveFunded = m_portfolioModel ? m_portfolioModel->getFundedAmountForGoal(item.goalName) : 0.0;
 
+            // 2. MATH FIX: Pass 'liveFunded' into the calculation
+            sumRequired += calculateRequiredSIP(item, fv, rate, liveFunded);
+
+            // 3. Fetch monthly commitment from SIP Model
             if (m_sipModel) {
                 sumActual += m_sipModel->getGoalSum(item.goalName);
             }
         }
 
         m_totalRequiredSIP = sumRequired;
-        // Prevent division by zero
         m_coverageRatio = (sumRequired > 0) ? (sumActual / sumRequired) * 100.0 : 0.0;
-        // Notify QML
+
         emit totalsChanged();
     }
 
-    void setSipModel(UnifiedSipModel* model) {
+    void setSipModel(SipModel* model) {
         m_sipModel = model;
         // This ensures "Actual SIP" and "Coverage Ratio" update on startup
         handleSipUpdate();
     }
 
+    void setPortfolioModel(PortfolioModel* model) {
+        m_portfolioModel = model;
+        updateTotals();
+        handleSipUpdate();
+    }
+
+    QStringList goalNamesWithNone() const {
+        QStringList names;
+        names << "- None -"; // The unselect option
+        for (const auto &item : m_data) {
+            names << item.goalName;
+        }
+        return names;
+    }
+
 public slots:
     void handleSipUpdate() {
         if (m_data.isEmpty()) return;
-        // This tells the QML ListView to re-call the data() function for the ActualSIPRole
-        emit dataChanged(index(0, 0), index(m_data.count() - 1, 0), {ActualSIPRole});
+        // Notify QML that both the SIP sum and the Portfolio sum have changed
+        emit dataChanged(index(0, 0), index(m_data.count() - 1, 0),
+                         {ActualSIPRole, CurrentFundedRole, RequiredSIPRole});
         updateTotals(); // update the footer (Total Required / Coverage)
     }
 
 signals:
     void settingsChanged();
     void totalsChanged();
+    void goalNamesChanged();
 
 private:
-    double calculateRequiredSIP(const GoalItem &item, double fv, double rate) const {
-        if (item.yearsLeft <= 0) return 0;
+    double calculateRequiredSIP(const GoalItem &item, double fv, double rate, double liveFunded) const {
+        if (item.yearsLeft <= 0 || rate <= 0) return 0;
 
         // Monthly compounded rate
         double r = std::pow(1.0 + (rate/100.0), 1.0/12.0) - 1.0;
         int n = item.yearsLeft * 12;
 
         // FV of current corpus growing at expected rate
-        double fvLump = item.currentFunded * std::pow(1.0 + (rate/100.0), item.yearsLeft);
+        double fvLump = liveFunded * std::pow(1.0 + (rate/100.0), item.yearsLeft);
         double gap = fv - fvLump;
 
+        // If your current assets will grow to be MORE than the target, Required SIP is 0
         if (gap <= 0) return 0;
 
-        // SIP Formula (Annuity Due: payment at start of period)
+        // SIP Formula (Annuity Due)
         return (gap * r) / ((std::pow(1.0 + r, n) - 1.0) * (1.0 + r));
     }
 
@@ -278,7 +333,8 @@ private:
     double m_totalRequiredSIP = 0;
     double m_coverageRatio = 0;
 
-    UnifiedSipModel* m_sipModel = nullptr;
+    SipModel* m_sipModel = nullptr;
+    PortfolioModel* m_portfolioModel = nullptr;
 };
 
 #endif

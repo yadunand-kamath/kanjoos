@@ -17,21 +17,21 @@ Rectangle {
     readonly property color colorCrypto: "#6c5ce7"
     readonly property color colorRealEstate: "#ff7675"
 
-    property real currentAssetTotal: unifiedSipModel.getTotal(currentType)
-    property real globalSipTotal: unifiedSipModel.getTotal("Total")
+    property real currentAssetTotal: sipModel.getTotal(currentType)
+    property real globalSipTotal: sipModel.getTotal("Total")
 
     Connections {
-        target: unifiedSipModel
+        target: sipModel
         // Whenever C++ emits sipUpdated (on add, remove, or edit)
         function onSipUpdated() {
-            sipPlannerRoot.currentAssetTotal = unifiedSipModel.getTotal(sipPlannerRoot.currentType)
-            sipPlannerRoot.globalSipTotal = unifiedSipModel.getTotal("Total")
+            sipPlannerRoot.currentAssetTotal = sipModel.getTotal(sipPlannerRoot.currentType)
+            sipPlannerRoot.globalSipTotal = sipModel.getTotal("Total")
         }
     }
 
     // Ensure the asset total updates when you switch tabs
     onCurrentTypeChanged: {
-        sipPlannerRoot.currentAssetTotal = unifiedSipModel.getTotal(sipPlannerRoot.currentType)
+        sipPlannerRoot.currentAssetTotal = sipModel.getTotal(sipPlannerRoot.currentType)
     }
 
     ColumnLayout {
@@ -82,7 +82,7 @@ Rectangle {
                     sipPlannerRoot.colorCrypto
                 ][sipPlannerRoot.assetTabIndex]
 
-                onClicked: unifiedSipModel.addEntry(sipPlannerRoot.currentType)
+                onClicked: sipModel.addEntry(sipPlannerRoot.currentType)
 
                 // Styled Content (Text)
                 contentItem: Text {
