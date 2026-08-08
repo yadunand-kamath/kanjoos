@@ -14,11 +14,11 @@ Popup {
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
     // Re-pull live data every time the popup opens, and keep it live while open.
-    property real currentTypeTotal: unifiedSipModel.getTotal(sipPlannerRoot.currentType)
+    property real currentTypeTotal: sipModel.getTotal(sipPlannerRoot.currentType)
 
     onOpened: refreshAll()
     Connections {
-        target: unifiedSipModel
+        target: sipModel
         function onSipUpdated() { if (analyticsPopup.opened) refreshAll() }
     }
     Connections {
@@ -26,7 +26,7 @@ Popup {
         function onCurrentTypeChanged() { if (analyticsPopup.opened) refreshAll() }
     }
     function refreshAll() {
-        currentTypeTotal = unifiedSipModel.getTotal(sipPlannerRoot.currentType);
+        currentTypeTotal = sipModel.getTotal(sipPlannerRoot.currentType);
         equityCategoryChart.refresh(); equityInstrumentChart.refresh(); equityMarketChart.refresh();
         debtTypeChart.refresh(); debtHoldingsChart.refresh();
         reTypeChart.refresh(); reHoldingsChart.refresh();
@@ -192,7 +192,7 @@ Popup {
 
         function refresh() {
             pieSeries.clear();
-            let entries = unifiedSipModel.getEntries(assetType);
+            let entries = sipModel.getEntries(assetType);
             let totals = {};
             let sum = 0;
             for (let i = 0; i < entries.length; i++) {

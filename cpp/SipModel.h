@@ -1,5 +1,5 @@
-#ifndef UNIFIEDSIPMODEL_H
-#define UNIFIEDSIPMODEL_H
+#ifndef SIPMODEL_H
+#define SIPMODEL_H
 
 #include <QAbstractListModel>
 #include <QVector>
@@ -14,13 +14,29 @@ struct SipItem {
     double amount;
 };
 
-class UnifiedSipModel : public QAbstractListModel {
+class SipModel : public QAbstractListModel {
     Q_OBJECT
 public:
     enum Roles { TypeRole = Qt::UserRole + 1, NameRole, MarketRole, SubTypeRole, CategoryRole, GoalRole, AmountRole };
 
-    explicit UnifiedSipModel(QObject *parent = nullptr) : QAbstractListModel(parent) {
-        m_data << SipItem{"Equity", "Nifty Index", "Domestic", "Mutual Fund", "Largecap", "Retirement", 15000.0};
+    explicit SipModel(QObject *parent = nullptr) : QAbstractListModel(parent) {
+        // EQUITY SIPs
+        m_data << SipItem{"Equity", "Nifty 50 Index", "Domestic", "Mutual Fund", "Largecap", "Retirement", 25000.0};
+        m_data << SipItem{"Equity", "Smallcap Fund", "Domestic", "Mutual Fund", "Smallcap", "Retirement", 10000.0};
+        m_data << SipItem{"Equity", "Nasdaq 100", "International", "ETF", "Largecap", "Home Downpayment", 15000.0};
+
+        // DEBT SIPs
+        m_data << SipItem{"Debt", "Recurring Deposit", "Domestic", "FD/RD", "-", "Emergency Fund", 10000.0};
+        m_data << SipItem{"Debt", "PPF", "Domestic", "Govt. Scheme", "-", "Retirement", 12500.0};
+
+        // REAL ESTATE SIPs
+        m_data << SipItem{"Real Estate", "REIT Monthly", "Domestic", "REITs", "-", "World Tour", 5000.0};
+
+        // COMMODITY SIPs
+        m_data << SipItem{"Commodity", "Digital Gold", "Domestic", "Digital", "-", "Emergency Fund", 2500.0};
+
+        // CRYPTO SIPs
+        m_data << SipItem{"Crypto", "ETH SIP", "-", "-", "-", "None", 1000.0};
     }
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const override { return m_data.count(); }

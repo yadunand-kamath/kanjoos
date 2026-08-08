@@ -8,7 +8,8 @@
 #include "cpp/RetirementAssetModel.h"
 #include "cpp/RetirementCalculator.h"
 #include "cpp/SipFilterProxy.h"
-#include "cpp/UnifiedSipModel.h"
+#include "cpp/SipModel.h"
+#include "cpp/PortfolioModel.h"
 
 int main(int argc, char *argv[])
 {
@@ -27,16 +28,23 @@ int main(int argc, char *argv[])
     RetirementAssetModel *retirementAssetModel = new RetirementAssetModel(&app);
     engine.rootContext()->setContextProperty("retirementAssetModel", retirementAssetModel);
 
-    UnifiedSipModel *unifiedSipModel = new UnifiedSipModel(&app);
+    SipModel *sipModel = new SipModel(&app);
     GoalModel *goalModel = new GoalModel(&app);
 
     // Give GoalModel the pointer to the SIP data
-    goalModel->setSipModel(unifiedSipModel);
+    goalModel->setSipModel(sipModel);
     // Connect the signal so GoalModel refreshes whenever SIP data changes
-    QObject::connect(unifiedSipModel, &UnifiedSipModel::sipUpdated, goalModel, &GoalModel::handleSipUpdate);
+    QObject::connect(sipModel, &SipModel::sipUpdated, goalModel, &GoalModel::handleSipUpdate);
 
-    engine.rootContext()->setContextProperty("unifiedSipModel", unifiedSipModel);
+    PortfolioModel *portfolioModel = new PortfolioModel(&app);
+    // Link it to GoalModel so goals can see their funded amounts
+    goalModel->setPortfolioModel(portfolioModel);
+    // Connect signal for refresh
+    QObject::connect(portfolioModel, &PortfolioModel::portfolioUpdated, goalModel, &GoalModel::handleSipUpdate);
+
+    engine.rootContext()->setContextProperty("sipModel", sipModel);
     engine.rootContext()->setContextProperty("goalModel", goalModel);
+    engine.rootContext()->setContextProperty("portfolioModel", portfolioModel);
 
     // Arguments: (Plugin Name, Major Version, Minor Version, QML Type Name)
     qmlRegisterType<SipFilterProxy>("FinancialComponents", 1, 0, "SipFilterProxy");

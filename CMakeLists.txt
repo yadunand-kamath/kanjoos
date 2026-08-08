@@ -18,34 +18,40 @@ qt_add_executable(appkanjoos
     cpp/InsuranceCalculator.h
     cpp/InsuranceCalculator.cpp
     cpp/GoalModel.h
+    cpp/SipModel.h
+    cpp/SipFilterProxy.h
 )
 
 qt_add_qml_module(appkanjoos
     URI kanjoos
     QML_FILES
         Main.qml
+
         qml/TitleBar.qml
+
         qml/page/CashFlow.qml
         qml/page/Overview.qml
         qml/page/Planner.qml
         qml/page/Portfolio.qml
         qml/page/SafetyNet.qml
+
         qml/page/subpage/EmergencyFund.qml
         qml/page/subpage/InsuranceTracker.qml
         qml/page/subpage/Retirement.qml
         qml/page/subpage/Goals.qml
         qml/page/subpage/SIPPlanner.qml
+        qml/page/subpage/SipTable.qml
+        qml/page/subpage/ChartsPopup.qml
+
+        qml/components/CustomComboBox.qml
         qml/components/CustomSlider.qml
-        qml/components/SaveButton.qml
         qml/components/ClearButton.qml
+        qml/components/SaveButton.qml
 
     RESOURCES
         assets/fonts/BJCree-Bold.ttf
-        SOURCES cpp/UnifiedSipModel.h
-        SOURCES cpp/SipFilterProxy.h
-        QML_FILES qml/page/subpage/SipTable.qml
-        QML_FILES qml/components/CustomComboBox.qml
-        QML_FILES qml/page/subpage/ChartsPopup.qml
+        SOURCES cpp/PortfolioModel.h
+        QML_FILES qml/page/subpage/PortfolioTable.qml
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
