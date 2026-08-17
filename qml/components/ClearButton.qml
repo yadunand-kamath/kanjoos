@@ -11,15 +11,12 @@ Button {
     hoverEnabled: true
 
     background: Rectangle {
-        implicitWidth: 90
-        implicitHeight: 32
+        implicitWidth: 90; implicitHeight: 32
         radius: 6
-        color: clearBtn.hovered ? "#333" : "#222"
-
-        // Smoothly transition the color change
-        Behavior on color { ColorAnimation { duration: 150 } }
-
+        color: clearBtn.hovered ? "#2e0a0a" : "#222"
         border.width: 1
-        border.color: clearBtn.hovered ? "white" : "transparent"
+        border.color: clearBtn.hovered ? "#8b0000" : "transparent"
+        Behavior on color       { ColorAnimation { duration: 150 } }
+        Behavior on border.color { ColorAnimation { duration: 150 } }
     }
 }
