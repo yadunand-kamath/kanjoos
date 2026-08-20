@@ -2,441 +2,634 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
+import "../components"
+
 Rectangle {
     id: overviewRoot
     color: "#000000"
 
-    property int refreshTick: 0
+    // ── PROPERTIES / BINDINGS ─────────────────────────────────────────────────
+    // getTotalValue is a Q_INVOKABLE — no auto-notify. Store results explicitly
+    // and refresh them all in onPortfolioUpdated so the whole page stays in sync.
+    property real portfolioTotal:    portfolioModel.getTotalValue("Total")
+    property real barEquity:         portfolioModel.getTotalValue("Equity")
+    property real barDebt:           portfolioModel.getTotalValue("Debt")
+    property real barRealEstate:     portfolioModel.getTotalValue("Real Estate")
+    property real barCommodity:      portfolioModel.getTotalValue("Commodity")
+    property real barCrypto:         portfolioModel.getTotalValue("Crypto")
+    property real actualNetWorth:    portfolioTotal - totalLiabilities
 
-    // BINDINGS TO C++ MODELS
-    property real actualNetWorth: portfolioModel.getTotalValue("Total") - totalLiabilities
-    property real displayedNetWorth: 0
+    // Static sub-type lists for liquidity — set once in Component.onCompleted
+    property var liquidSubTypes:   ["Stock", "Mutual Fund", "ETF",
+                                    "FD/RD", "Bond", "Fund", "Cash & Savings",
+                                    "REITs", "Digital", "ETF/Fund", "Crypto"]
+    property var illiquidSubTypes: ["ESOPs", "Private", "Govt. Scheme",
+                                    "Residential", "Commercial", "Physical"]
 
-    property real minContentWidth: 320
-    readonly property real dashboardWidth: 550
+    property real liquidValue:   portfolioModel.getLiquidValue(liquidSubTypes)
+    property real illiquidValue: portfolioModel.getIlliquidValue(illiquidSubTypes)
+    property real totalAssets:   liquidValue + illiquidValue
+    property real totalLiabilities: 0
 
-    // Liquid: Equity + Debt + Crypto + Commodities
-    property real liquidValue: portfolioModel.getTotalValue("Equity") + portfolioModel.getTotalValue("Debt") +
-                               portfolioModel.getTotalValue("Crypto") + portfolioModel.getTotalValue("Commodity")
+    // getGoalFundedRatio — funded ÷ target corpus (0–1+); NOT coverageRatio (SIP ÷ required SIP)
+    property real emergencyCoverage: 0.0
+    property real retirementCoverage: 0.0
 
-    // Illiquid: Real Estate
-    property real illiquidValue: portfolioModel.getTotalValue("Real Estate")
+    // Last-updated timestamp (set whenever data changes; persisted later)
+    property string lastUpdated: ""
 
-    property real totalAssets: liquidValue + illiquidValue
-    property real totalLiabilities: 0 // Updated via the "TRACK" modal
+    // ── refreshGoalCoverage ───────────────────────────────────────────────────
+    function refreshGoalCoverage() {
+        emergencyCoverage  = goalModel.getGoalFundedRatio("Emergency Fund");
+        retirementCoverage = goalModel.getGoalFundedRatio("Retirement");
+    }
 
-    // Liquid Assets = Sum of Cash, Savings, and Equity (for this example)
-    property real liquidNetWorth: portfolioModel.getTotalValue("Equity") + portfolioModel.getTotalValue("Debt")
-
-    // Progress bar tracker
-    property real emergencyCoverage: goalModel.getGoalCoverage("Emergency Fund")
-    property real retirementCoverage: goalModel.getGoalCoverage("Retirement")
-
+    // ── CONNECTIONS ───────────────────────────────────────────────────────────
     Connections {
         target: goalModel
-        function onTotalsChanged() {
-            overviewRoot.emergencyCoverage = goalModel.getGoalCoverage("Emergency Fund")
-            overviewRoot.retirementCoverage = goalModel.getGoalCoverage("Retirement")
+        function onTotalsChanged() { overviewRoot.refreshGoalCoverage() }
+    }
+
+    Connections {
+        target: portfolioModel
+        function onPortfolioUpdated() {
+            // Re-read all invokable return values — bindings on Q_INVOKABLE calls
+            // break after beginResetModel (used by clearAll), so we refresh manually.
+            overviewRoot.portfolioTotal  = portfolioModel.getTotalValue("Total")
+            overviewRoot.barEquity       = portfolioModel.getTotalValue("Equity")
+            overviewRoot.barDebt         = portfolioModel.getTotalValue("Debt")
+            overviewRoot.barRealEstate   = portfolioModel.getTotalValue("Real Estate")
+            overviewRoot.barCommodity    = portfolioModel.getTotalValue("Commodity")
+            overviewRoot.barCrypto       = portfolioModel.getTotalValue("Crypto")
+            overviewRoot.liquidValue     = portfolioModel.getLiquidValue(overviewRoot.liquidSubTypes)
+            overviewRoot.illiquidValue   = portfolioModel.getIlliquidValue(overviewRoot.illiquidSubTypes)
+            overviewRoot.refreshGoalCoverage()
         }
     }
 
-    // Dynamic System Status
+    // ── systemStatus ──────────────────────────────────────────────────────────
+    // coverageRatio is actual-SIP ÷ required-SIP (%), not corpus funded ratio.
     property string systemStatus: {
-        if (goalModel.coverageRatio < 50)
-            return "> [ CRITICAL ] Global funding deficit. High risk to Goals."
-        if (goalModel.coverageRatio < 100)
-            return "> [ WARN ] Moderate SIP shortfall detected."
-        return "> [ OK ] Systems nominal. All goals on track."
+        let cov = goalModel.coverageRatio;
+        let req = goalModel.totalRequiredSIP;
+        let act = goalModel.coverageRatio > 0 ? req * (cov / 100) : 0;
+        let shortfall = req - act;
+
+        if (cov <= 0 && req <= 0)
+            return "> [ -- ] Enter goal data to see system status."
+        if (cov < 50)
+            return "> [ CRITICAL ] SIP coverage " + cov.toFixed(0) + "% — ₹" +
+                   shortfall.toLocaleString(Qt.locale(), 'f', 0) + "/mo shortfall. Immediate action needed."
+        if (cov < 100)
+            return "> [ WARN ] SIP coverage " + cov.toFixed(0) + "% — ₹" +
+                   shortfall.toLocaleString(Qt.locale(), 'f', 0) + "/mo below target."
+        return "> [ OK ] All goals fully funded. Surplus SIP capacity: ₹" +
+               (act - req).toLocaleString(Qt.locale(), 'f', 0) + "/mo."
     }
 
-    Behavior on displayedNetWorth {
-        NumberAnimation {
-            duration: Math.max(800, Math.min(2000, overviewRoot.actualNetWorth / 10000))
-            easing.type: Easing.OutExpo
-        }
-    }
-
-    onVisibleChanged: {
-        if (visible) {
-            overviewRoot.displayedNetWorth = 0 // Reset
-            Qt.callLater(function() {
-                overviewRoot.displayedNetWorth = overviewRoot.actualNetWorth
-            })
-        }
-    }
-
-    onActualNetWorthChanged: {
-        if (visible) {
-            overviewRoot.displayedNetWorth = overviewRoot.actualNetWorth
-        }
-    }
-
+    // ── Component.onCompleted ─────────────────────────────────────────────────
     Component.onCompleted: {
-        overviewRoot.displayedNetWorth = overviewRoot.actualNetWorth
+        refreshGoalCoverage();
     }
 
+    // ── MAIN LAYOUT ───────────────────────────────────────────────────────────
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 40
         anchors.topMargin: 10
-        spacing: 40
+        spacing: 30
 
-        // --- 1. THE HEADLINE (NET WORTH ROLL-UP) ---
+        // ── NET WORTH HEADLINE ────────────────────────────────────────────────
         ColumnLayout {
-            id: netWorthContainer
             Layout.fillWidth: true
             Layout.alignment: Qt.AlignHCenter
-            // Width hugs the net worth number itself, with a floor so the
-            // bar/grid below don't collapse when the figure is small.
-            Layout.preferredWidth: Math.max(netWorthText.implicitWidth, minContentWidth)
-            spacing: 5
+            spacing: 4
 
             Text {
                 text: "NET WORTH"
-                color: "#999"
-                font.pixelSize: 14; font.bold: true; font.letterSpacing: 2
+                color: "#666"
+                font.pixelSize: 12; font.bold: true; font.letterSpacing: 3
                 Layout.alignment: Qt.AlignHCenter
             }
 
-            // Net Worth Value
             Text {
                 id: netWorthText
-                text: root.currencySymbol + " " + Math.floor(overviewRoot.displayedNetWorth).toLocaleString(Qt.locale(), 'f', 0)
-                color: "#FFFFFF"
-                font.pixelSize: 64; font.bold: true
+                text: root.currencySymbol + " " + Math.floor(overviewRoot.actualNetWorth).toLocaleString(Qt.locale(), 'f', 0)
+                color: overviewRoot.actualNetWorth >= 0 ? "#FFFFFF" : "#F44336"
+                font.pixelSize: 60; font.bold: true
                 Layout.alignment: Qt.AlignHCenter
             }
 
-            // DIVERSIFICATION
-            RowLayout {
-                Layout.fillWidth: true
+            // Last updated label — placeholder until persistence
+            Text {
+                text: overviewRoot.lastUpdated !== "" ? "Last updated: " + overviewRoot.lastUpdated : "Last updated: —"
+                color: "#444"
+                font.pixelSize: 10; font.italic: true
                 Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 15
-                spacing: 10
+            }
 
-                // Hover Label - Asset Name
+            // ── DIVERSIFICATION BAR ───────────────────────────────────────────
+            RowLayout {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: 12
+                spacing: 12
+
+                // Left label: hovered asset name
                 Text {
-                    text: divBar.hoverLabel
-                    color: "#888"
-                    font.pixelSize: 12; font.bold: true; font.letterSpacing: 1
-
-                    // This prevents the bar from moving
-                    Layout.preferredWidth: 150
+                    id: barLeftLabel
+                    text: "DIVERSIFICATION"
+                    color: "#555"
+                    font.pixelSize: 11; font.bold: true; font.letterSpacing: 1
+                    Layout.preferredWidth: 140
                     horizontalAlignment: Text.AlignRight
                 }
 
-                // Composition Bar Container
+                // Bar
                 Rectangle {
                     id: barContainer
-                    Layout.preferredWidth: netWorthText.width // width for the visual bar
-                    Layout.preferredHeight: 10
+                    width: Math.max(netWorthText.implicitWidth, 320)
+                    height: 10
                     color: "#1A1A1A"
-                    Layout.alignment: Qt.AlignVCenter
-                    radius: 0
+                    radius: 2
 
-                    MouseArea {
-                        anchors.fill: parent
-                        // Make the exit-box even larger so user doesn't have to be precise
-                        anchors.margins: -15
-                        hoverEnabled: true
-
-                        onPositionChanged: {
-                            // Calculate which child segment is under the mouse x coordinate
-                            let hit = divBar.childAt(mouseX, height / 2)
-                            if (hit && hit.type !== undefined) {
-                                divBar.hoverLabel = hit.type.toUpperCase() + ":"
-                                divBar.hoverValue = root.currencySymbol + " " + hit.val.toLocaleString(Qt.locale(), 'f', 0)
-                            }
-                        }
-
-                        onExited: {
-                            divBar.hoverLabel = "DIVERSIFICATION:"
-                            divBar.hoverValue = ""
-                        }
-                    }
-
-                    // Composition Bar
                     Row {
                         id: divBar
                         anchors.fill: parent
                         clip: true
 
-                        // Properties updated by BarSegment hover
-                        property string hoverLabel: "DIVERSIFICATION:"
-                        property string hoverValue: ""
+                        property string hoverType: ""
+                        property real   hoverVal:  0
 
-                        BarSegment { type: "Equity"; val: portfolioModel.getTotalValue("Equity"); color: "#00d2ff" }
-                        BarSegment { type: "Debt"; val: portfolioModel.getTotalValue("Debt"); color: "#a29bfe" }
-                        BarSegment { type: "Real Estate"; val: portfolioModel.getTotalValue("Real Estate"); color: "#ff7675" }
-                        BarSegment { type: "Commodity"; val: portfolioModel.getTotalValue("Commodity"); color: "#f1c40f" }
-                        BarSegment { type: "Crypto"; val: portfolioModel.getTotalValue("Crypto"); color: "#6c5ce7" }
+                        BarSegment { segType: "Equity";      segVal: overviewRoot.barEquity;     segColor: "#00d2ff" }
+                        BarSegment { segType: "Debt";        segVal: overviewRoot.barDebt;       segColor: "#a29bfe" }
+                        BarSegment { segType: "Real Estate"; segVal: overviewRoot.barRealEstate; segColor: "#ff7675" }
+                        BarSegment { segType: "Commodity";   segVal: overviewRoot.barCommodity;  segColor: "#f1c40f" }
+                        BarSegment { segType: "Crypto";      segVal: overviewRoot.barCrypto;     segColor: "#6c5ce7" }
                     }
                 }
 
-                // Hover Label - Asset Value
+                // Right label: hovered value
                 Text {
-                    text: divBar.hoverValue
-                    color: "#888"; font.bold: true
-                    font.pixelSize: 12; font.family: "Monospace"
-
-                    // This prevents the bar from moving
-                    Layout.preferredWidth: 150
+                    id: barRightLabel
+                    text: divBar.hoverType !== "" ? root.currencySymbol + " " + divBar.hoverVal.toLocaleString(Qt.locale(), 'f', 0) : ""
+                    color: "#CCCCCC"
+                    font.pixelSize: 11; font.bold: true; font.family: "Monospace"
+                    Layout.preferredWidth: 140
                     horizontalAlignment: Text.AlignLeft
                 }
-
             }
         }
 
-        // --- 2. THE 2x2 METRICS GRID ---
-        ColumnLayout {
-            Layout.alignment: Qt.AlignHCenter
-            // Matches the headline/composition-bar width, but allows
-            // growing to fit its own content (e.g. the liabilities row)
-            // if that content doesn't fit at the matched width.
-            Layout.preferredWidth: overviewRoot.dashboardWidth // Use shared width
-            Layout.fillWidth: false
-            spacing: 20
+        // ── METRICS ROW ───────────────────────────────────────────────────────
+        // Item + Row: children use width: parent.width/3, avoiding Layout circular bindings.
+        Item {
+            Layout.fillWidth: true
+            Layout.leftMargin: 40
+            Layout.rightMargin: 40
+            implicitHeight: 56
 
-            // ROW 1: LIQUID VS ILLIQUID
-            RowLayout {
-                Layout.preferredWidth: overviewRoot.dashboardWidth
-                Layout.alignment: Qt.AlignHCenter
-                spacing: 40
+            Row {
+                anchors.fill: parent
 
-                MetricToggleCell {
+                // LIQUID ASSETS
+                MetricCell {
+                    width: parent.width / 3; height: parent.height
                     label: "LIQUID ASSETS"
-                    percentage: (liquidValue / totalAssets * 100)
+                    percentage: totalAssets > 0 ? (liquidValue / totalAssets * 100) : 0
                     absoluteValue: liquidValue
                     accent: "#43e97b"
-                    Layout.preferredWidth: (overviewRoot.dashboardWidth / 2) - 20
                 }
 
-                MetricToggleCell {
+                // Divider
+                Rectangle { width: 1; height: parent.height; color: "#222" }
+
+                // ILLIQUID ASSETS — dark orange, distinct from Real Estate red
+                MetricCell {
+                    width: parent.width / 3 - 1; height: parent.height
                     label: "ILLIQUID ASSETS"
-                    percentage: (illiquidValue / totalAssets * 100)
+                    percentage: totalAssets > 0 ? (illiquidValue / totalAssets * 100) : 0
                     absoluteValue: illiquidValue
-                    accent: "#F44336"
-                    Layout.preferredWidth: (overviewRoot.dashboardWidth / 2) - 20
+                    accent: "#e67e22"
                 }
-            }
 
-            // ROW 2: LIABILITIES & TRACK
-            Rectangle {
-                Layout.fillWidth: true
-                height: 50
-                color: "#121212"
-                border.color: "#2A2A2A"
+                // Divider
+                Rectangle { width: 1; height: parent.height; color: "#222" }
 
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 15; anchors.rightMargin: 10
+                // LIABILITIES — label above, value + TRACK button on same row
+                Item {
+                    width: parent.width / 3 - 1; height: parent.height
 
                     Column {
-                        Text { text: "TOTAL LIABILITIES"; color: "#888"; font.pixelSize: 9; font.bold: true }
+                        anchors.centerIn: parent
+                        spacing: 6
+
                         Text {
-                            text: root.currencySymbol + " " + totalLiabilities.toLocaleString(Qt.locale(), 'f', 0)
-                            color: "#FF0000"; font.pixelSize: 18; font.bold: true; font.family: "Monospace"
+                            text: "TOTAL LIABILITIES"
+                            color: "#555"; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1
+                            anchors.horizontalCenter: parent.horizontalCenter
                         }
-                    }
 
-                    Item { Layout.fillWidth: true }
+                        Row {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            spacing: 10
 
-                    Button {
-                        text: "TRACK"
-                        onClicked: liabilityModal.open()
-                        contentItem: Text { text: parent.text; color: "white"; font.bold: true; font.pixelSize: 11 }
-                        background: Rectangle {
-                            implicitWidth: 80; implicitHeight: 30
-                            color: "#2A2A2A"
-                            border.color: parent.hovered ? "#FF0000" : "#333"
+                            Text {
+                                text: root.currencySymbol + " " + totalLiabilities.toLocaleString(Qt.locale(), 'f', 0)
+                                color: totalLiabilities > 0 ? "#F44336" : "#444"
+                                font.pixelSize: 22; font.bold: true; font.family: "Monospace"
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+
+                            // TRACK button
+                            Rectangle {
+                                width: 52; height: 20; radius: 4
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: trackArea.containsMouse ? "#2a0a0a" : "transparent"
+                                border.color: trackArea.containsMouse ? "#F44336" : "#3a1a1a"
+                                border.width: 1
+                                Behavior on color        { ColorAnimation { duration: 150 } }
+                                Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "TRACK"
+                                    color: trackArea.containsMouse ? "#F44336" : "#555"
+                                    font.pixelSize: 9; font.bold: true; font.letterSpacing: 1
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
+
+                                MouseArea {
+                                    id: trackArea
+                                    anchors.fill: parent; hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: liabilityModal.open()
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        // --- 3. SYSTEM STATUS TERMINAL ---
+        // ── SYSTEM STATUS RECTANGLE ───────────────────────────────────────────
         Rectangle {
-            Layout.preferredWidth: overviewRoot.dashboardWidth
-            Layout.preferredHeight: 40
+            Layout.preferredWidth: 640
+            Layout.preferredHeight: 36
             Layout.alignment: Qt.AlignHCenter
-            color: "#121212"
-            border.color: "#2A2A2A"
-            radius: 0 // Brutalist sharp edge
+            color: "#0D0D0D"
+            border.color: "#1E1E1E"
+            radius: 2
 
             Text {
                 anchors.centerIn: parent
                 text: overviewRoot.systemStatus
-                color: "#FF9100"
-                font.family: "Monospace"
-                font.pixelSize: 12
-                font.bold: true
+                color: {
+                    if (overviewRoot.systemStatus.indexOf("CRITICAL") !== -1) return "#F44336"
+                    if (overviewRoot.systemStatus.indexOf("WARN")     !== -1) return "#FF9100"
+                    if (overviewRoot.systemStatus.indexOf("OK")       !== -1) return "#43e97b"
+                    return "#555"
+                }
+                font.family: "Monospace"; font.pixelSize: 11; font.bold: true
             }
         }
 
-        // --- 4. CORE PROGRESS BARS (VELOCITY HEALTH) ---
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.maximumWidth: 800
+        // ── PROGRESS BARS ─────────────────────────────────────────────────────
+        VelocityTrack {
+            title: "EMERGENCY FUND"
+            subtitle: "Funded vs. Target"
+            percent: overviewRoot.emergencyCoverage
+            fillColor: "#43e97b"
+            Layout.preferredWidth: 640
             Layout.alignment: Qt.AlignHCenter
-            spacing: 50 // Large horizontal gap
-
-            Connections {
-                target: goalModel
-                // When the GoalModel signals a total change, increment the tick
-                function onTotalsChanged() { overviewRoot.refreshTick++ }
-            }
-
-            VelocityTrack {
-                title: "EMERGENCY FUND"
-                percent: overviewRoot.emergencyCoverage
-                fillColor: "#43e97b"
-                Layout.fillWidth: true
-            }
-
-            VelocityTrack {
-                title: "RETIREMENT"
-                percent: overviewRoot.retirementCoverage
-                fillColor: "#00d2ff"
-                Layout.fillWidth: true
-            }
         }
 
-        Item { Layout.fillHeight: true } // Spacer to push content up
+        VelocityTrack {
+            title: "RETIREMENT"
+            subtitle: "Funded vs. Target"
+            percent: overviewRoot.retirementCoverage
+            fillColor: "#00d2ff"
+            Layout.preferredWidth: 640
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        Item { Layout.fillHeight: true }
     }
 
-    // --- 5. THE GLOBAL FOOTER ---
+    // ── FOOTER ────────────────────────────────────────────────────────────────
     Rectangle {
-        id: globalFooter
         anchors.bottom: parent.bottom
         width: parent.width
-        height: 85
-        color: "#1A1A1A"
-        border.color: "#2A2A2A"
+        height: 80
+        color: "#0D0D0D"
+        border.color: "#1E1E1E"
 
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 10
+            anchors.leftMargin: 40; anchors.rightMargin: 40
             spacing: 0
 
             FooterCol {
-                label: "TOTAL SIP"
-                value: root.currencySymbol + " 45,000"
+                label: "TOTAL SIP / MO"
+                value: root.currencySymbol + " " + goalModel.totalRequiredSIP.toLocaleString(Qt.locale(), 'f', 0)
                 Layout.fillWidth: true
             }
 
-            Rectangle { width: 1; Layout.fillHeight: true; color: "#2A2A2A"; Layout.margins: 10 }
+            Rectangle { width: 1; height: 40; color: "#1E1E1E" }
 
             FooterCol {
                 label: "GOALS COVERAGE"
-                value: "72.4%"
+                value: goalModel.coverageRatio.toFixed(1) + "%"
+                valueColor: goalModel.coverageRatio >= 100 ? "#43e97b" : (goalModel.coverageRatio >= 50 ? "#FF9100" : "#F44336")
                 Layout.fillWidth: true
             }
 
-            Rectangle { width: 1; Layout.fillHeight: true; color: "#2A2A2A"; Layout.margins: 10 }
+            Rectangle { width: 1; height: 40; color: "#1E1E1E" }
 
             FooterCol {
                 label: "TOTAL PORTFOLIO"
-                value: root.currencySymbol + " 1.24Cr"
+                value: root.currencySymbol + " " + overviewRoot.portfolioTotal.toLocaleString(Qt.locale(), 'f', 0)
                 Layout.fillWidth: true
             }
         }
     }
 
-    // --- INTERNAL COMPONENTS ---
-    component MetricToggleCell : ColumnLayout {
-
-        property string label: ""
-        property real percentage: 0
-        property real absoluteValue: 0
-        property color accent: "white"
-
-        Text { text: label; color: "#444"; font.pixelSize: 9; font.bold: true }
-
-        MouseArea {
-            id: ma
-            Layout.fillWidth: true
-            height: 30
-            hoverEnabled: true
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: ma.containsMouse
-                      ? root.currencySymbol + " " + absoluteValue.toLocaleString(Qt.locale(), 'f', 0)
-                      : percentage.toFixed(1) + "%"
-                color: ma.containsMouse ? "white" : accent
-                font.pixelSize: 22; font.bold: true; font.family: "Monospace"
-            }
-        }
-    }
-
-    // Simple Liability Modal
-    Dialog {
+    // ── LIABILITY MODAL ───────────────────────────────────────────────────────
+    Popup {
         id: liabilityModal
-        title: "Liability Tracker"
         anchors.centerIn: parent
         modal: true
-        standardButtons: Dialog.Ok
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        padding: 0
+        width: 320
+
+        background: Rectangle {
+            color: "#141414"
+            border.color: "#2A2A2A"
+            border.width: 1
+            radius: 8
+        }
 
         ColumnLayout {
-            spacing: 15
-            Text { text: "Enter Total Outstanding Liabilities (Loans, Cards, Bills):"; color: "#888" }
-            TextField {
-                id: liabInput
-                placeholderText: "0.00"
-                text: totalLiabilities.toString()
-                onTextChanged: totalLiabilities = parseFloat(text || 0)
-                validator: DoubleValidator { bottom: 0 }
+            width: parent.width
+            spacing: 0
+
+            // Header: Save (left) · LIABILITIES (center) · × (right)
+            Item {
                 Layout.fillWidth: true
+                Layout.preferredHeight: 48
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 12; anchors.rightMargin: 12
+                    spacing: 8
+
+                    // Save — stamps timestamp and closes
+                    SaveButton {
+                        text: "Save"
+                        Layout.alignment: Qt.AlignVCenter
+                        onClicked: {
+                            overviewRoot.lastUpdated = Qt.formatDateTime(new Date(), "dd MMM yyyy, hh:mm")
+                            liabilityModal.close()
+                        }
+                    }
+
+                    // Centered title
+                    Text {
+                        text: "LIABILITIES"
+                        color: "#F44336"; font.bold: true; font.pixelSize: 13; font.letterSpacing: 2
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    // Close ×
+                    Rectangle {
+                        width: 28; height: 28; radius: 14
+                        color: closeArea.containsMouse ? "#2a0a0a" : "transparent"
+                        border.color: closeArea.containsMouse ? "#555" : "transparent"
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                        Text { text: "×"; color: "#888"; font.pixelSize: 20; anchors.centerIn: parent }
+                        MouseArea {
+                            id: closeArea; anchors.fill: parent; hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: liabilityModal.close()
+                        }
+                    }
+                }
+
+                Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: "#2A2A2A" }
+            }
+
+            // Rows — one per liability category
+            Repeater {
+                model: liabilityModel
+                delegate: ColumnLayout {
+                    spacing: 0
+                    Layout.fillWidth: true
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 16; Layout.rightMargin: 16
+                        Layout.topMargin: 10; Layout.bottomMargin: 10
+                        spacing: 10
+
+                        // Label — fixed width so inputs align
+                        Text {
+                            text: model.label
+                            color: "#888"; font.pixelSize: 12
+                            Layout.preferredWidth: 110
+                        }
+
+                        // ₹ prefix chip + text field
+                        RowLayout {
+                            spacing: 0
+                            Layout.fillWidth: true
+
+                            Rectangle {
+                                width: 24; height: 30; color: "#1A1A1A"; radius: 4
+                                Text {
+                                    text: root.currencySymbol
+                                    color: "#555"; font.pixelSize: 12; anchors.centerIn: parent
+                                }
+                            }
+
+                            TextField {
+                                id: liabField
+                                text: model.amount > 0 ? model.amount.toFixed(0) : ""
+                                placeholderText: "0"
+                                color: "white"; font.pixelSize: 13
+                                Layout.fillWidth: true
+                                leftPadding: 8
+                                selectByMouse: true
+                                validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
+                                inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                onTextEdited: {
+                                    let v = parseFloat(text) || 0;
+                                    liabilityModel.setProperty(index, "amount", v);
+                                    overviewRoot.totalLiabilities = overviewRoot.sumLiabilities();
+                                }
+                                background: Rectangle {
+                                    color: "#1A1A1A"; radius: 4; implicitHeight: 30
+                                    border.color: liabField.activeFocus ? "#F44336" : "transparent"; border.width: 1
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle { Layout.fillWidth: true; height: 1; color: "#1E1E1E" }
+                }
+            }
+
+            // Total row
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: 16; Layout.rightMargin: 16
+                Layout.topMargin: 12; Layout.bottomMargin: 14
+
+                Text { text: "TOTAL"; color: "#888"; font.pixelSize: 10; font.bold: true; font.letterSpacing: 1 }
+                Item { Layout.fillWidth: true }
+                Text {
+                    text: root.currencySymbol + " " + overviewRoot.totalLiabilities.toLocaleString(Qt.locale(), 'f', 0)
+                    color: overviewRoot.totalLiabilities > 0 ? "#F44336" : "#444"
+                    font.pixelSize: 18; font.bold: true; font.family: "Monospace"
+                }
             }
         }
     }
 
+    // ── liabilityModel + sumLiabilities ──────────────────────────────────────
+    ListModel {
+        id: liabilityModel
+        ListElement { label: "Home Loan";   amount: 0 }
+        ListElement { label: "Car Loan";    amount: 0 }
+        ListElement { label: "Personal Loan"; amount: 0 }
+        ListElement { label: "Credit Cards"; amount: 0 }
+        ListElement { label: "Other";       amount: 0 }
+    }
+
+    // Called on every keystroke in the modal so totalLiabilities (and thus actualNetWorth) updates live.
+    function sumLiabilities() {
+        let t = 0;
+        for (let i = 0; i < liabilityModel.count; i++) t += liabilityModel.get(i).amount;
+        return t;
+    }
+
+    // ── INTERNAL COMPONENTS ───────────────────────────────────────────────────
+
+    // ── MetricCell ────────────────────────────────────────────────────────────
+    // Hover toggles between percentage and absolute value on the same Text node.
+    // MetricCell is a plain Item (not ColumnLayout) to avoid recursive-rearrange
+    // when nested inside the parent RowLayout with Layout.fillWidth on both sides.
+    component MetricCell : Item {
+        property string label: ""
+        property real   percentage: 0
+        property real   absoluteValue: 0
+        property color  accent: "white"
+        implicitHeight: 56
+
+        Text {
+            id: cellLabel
+            anchors.top: parent.top; anchors.horizontalCenter: parent.horizontalCenter
+            text: label
+            color: "#555"; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1
+        }
+
+        // Hover: show absolute value; idle: show percentage
+        MouseArea {
+            id: metricMA
+            anchors { top: cellLabel.bottom; topMargin: 4; left: parent.left; right: parent.right; bottom: parent.bottom }
+            hoverEnabled: true
+
+            Text {
+                anchors.centerIn: parent
+                text: metricMA.containsMouse
+                      ? root.currencySymbol + " " + absoluteValue.toLocaleString(Qt.locale(), 'f', 0)
+                      : percentage.toFixed(1) + "%"
+                color: metricMA.containsMouse ? "white" : accent
+                font.pixelSize: 22; font.bold: true; font.family: "Monospace"
+                Behavior on color { ColorAnimation { duration: 150 } }
+            }
+        }
+    }
+
+    // ── BarSegment ────────────────────────────────────────────────────────────
+    // Uses portfolioTotal (not liquidValue+illiquidValue) so all asset types including
+    // Crypto (subType "-") are proportioned correctly and always visible.
+    component BarSegment : Rectangle {
+        property string segType:  ""
+        property real   segVal:   0
+        property color  segColor: "white"
+
+        color:   segColor
+        width:   overviewRoot.portfolioTotal > 0 ? (barContainer.width * (segVal / overviewRoot.portfolioTotal)) : 0
+        height:  parent.height
+        visible: width > 0.5
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            onEntered: { divBar.hoverType = segType; divBar.hoverVal = segVal; barLeftLabel.text = segType.toUpperCase(); }
+            onExited:  { divBar.hoverType = ""; divBar.hoverVal = 0; barLeftLabel.text = "DIVERSIFICATION"; }
+        }
+    }
+
+    // ── VelocityTrack ─────────────────────────────────────────────────────────
+    // percent is a 0–1+ ratio from getGoalFundedRatio; clamped to 1.0 for the bar width.
     component VelocityTrack : ColumnLayout {
         property string title: ""
-        property real percent: 0.0
-        property color fillColor: "white"
-        spacing: 8
+        property string subtitle: ""
+        property real   percent: 0.0
+        property color  fillColor: "white"
+        spacing: 6
 
         RowLayout {
             Layout.fillWidth: true
-            Text { text: title; color: "white"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1 }
+
+            ColumnLayout {
+                spacing: 1
+                Text { text: title;    color: "white"; font.pixelSize: 11; font.bold: true; font.letterSpacing: 1 }
+                Text { text: subtitle; color: "#444";  font.pixelSize: 9 }
+            }
+
             Item { Layout.fillWidth: true }
-            Text { text: (percent * 100).toFixed(0) + "%"; color: "#888888"; font.pixelSize: 11; font.family: "Monospace" }
+
+            Text {
+                text: (percent * 100).toFixed(0) + "%"
+                color: "#888"; font.pixelSize: 11; font.family: "Monospace"
+            }
         }
 
         Rectangle {
-            Layout.fillWidth: true; height: 6; color: "#2A2A2A"
+            Layout.fillWidth: true; height: 6; color: "#1A1A1A"; radius: 3
             Rectangle {
-                width: parent.width * percent; height: parent.height; color: fillColor
+                width: parent.width * Math.min(1.0, percent)
+                height: parent.height; color: fillColor; radius: 3
                 Behavior on width { NumberAnimation { duration: 1000; easing.type: Easing.OutCubic } }
             }
         }
     }
 
-    component BarSegment : Rectangle {
-        property string type: ""
-        property real val: 0
-
-        // Width is calculated based on the 500px parent container
-        width: (overviewRoot.totalAssets > 0) ? (barContainer.width * (val / overviewRoot.totalAssets)) : 0
-        height: parent.height
-        visible: width > 0.5
-
-        MouseArea {
-            anchors.fill: parent; hoverEnabled: true
-            width: parent.width; height: 30
-            onEntered: {
-                divBar.hoverLabel = type.toUpperCase()
-                divBar.hoverValue = root.currencySymbol + " " + val.toLocaleString(Qt.locale(), 'f', 0)
-            }
-        }
-    }
-
+    // ── FooterCol ─────────────────────────────────────────────────────────────
     component FooterCol : ColumnLayout {
         property string label: ""
         property string value: ""
-        spacing: 2
-        Text { text: label; color: "#888888"; font.pixelSize: 10; font.bold: true; Layout.alignment: Qt.AlignHCenter }
-        Text { text: value; color: "white"; font.pixelSize: 22; font.bold: true; Layout.alignment: Qt.AlignHCenter }
+        property color  valueColor: "white"
+        spacing: 3
+
+        // Center children horizontally within the column
+        Layout.alignment: Qt.AlignHCenter
+
+        Text {
+            text: label
+            color: "#555"; font.pixelSize: 9; font.bold: true; font.letterSpacing: 1
+            horizontalAlignment: Text.AlignHCenter
+            Layout.alignment: Qt.AlignHCenter
+        }
+        Text {
+            text: value
+            color: valueColor; font.pixelSize: 20; font.bold: true; font.family: "Monospace"
+            horizontalAlignment: Text.AlignHCenter
+            Layout.alignment: Qt.AlignHCenter
+        }
     }
 }
