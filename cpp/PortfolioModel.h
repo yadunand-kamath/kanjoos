@@ -3,6 +3,7 @@
 
 #include <QAbstractListModel>
 #include <QVector>
+#include <QStringList>
 
 struct PortfolioItem {
     QString assetType;
@@ -55,6 +56,9 @@ public:
         switch (role) {
         case TypeRole: return item.assetType;
         case NameRole: return item.name;
+        case MarketRole:   return item.market;
+        case SubTypeRole:  return item.subType;
+        case CategoryRole: return item.category;
         case InvestedRole: return item.invested;
         case ValueRole: return item.currentValue;
         case GoalRole: return item.goalLink;
@@ -109,6 +113,44 @@ public:
         emit portfolioUpdated();
     }
 
+    // Remove all entries of a specific asset type
+    Q_INVOKABLE void clearAsset(const QString &type) {
+        for (int i = m_data.count() - 1; i >= 0; --i) {
+            if (m_data[i].assetType == type) {
+                beginRemoveRows(QModelIndex(), i, i);
+                m_data.removeAt(i);
+                endRemoveRows();
+            }
+        }
+        emit portfolioUpdated();
+    }
+
+    // Remove all portfolio entries
+    Q_INVOKABLE void clearAll() {
+        if (m_data.isEmpty()) return;
+        beginResetModel();
+        m_data.clear();
+        endResetModel();
+        emit portfolioUpdated();
+    }
+
+    Q_INVOKABLE QVariantList getEntries(const QString &type) const {
+        QVariantList result;
+        for (const auto &item : std::as_const(m_data)) {
+            if (type != "Total" && item.assetType != type) continue;
+            QVariantMap m;
+            m["name"]     = item.name;
+            m["subType"]  = item.subType;
+            m["category"] = item.category;
+            m["market"]   = item.market;
+            m["invested"] = item.invested;
+            m["value"]    = item.currentValue;
+            m["goalLink"] = item.goalLink;
+            result << m;
+        }
+        return result;
+    }
+
     Q_INVOKABLE double getTotalValue(QString type) {
         double sum = 0;
         for (const auto &item : std::as_const(m_data)) {
@@ -117,8 +159,43 @@ public:
         return sum;
     }
 
+    // Sum current value for entries whose subType is in the provided list
+    Q_INVOKABLE double getLiquidValue(const QStringList &liquidSubTypes) const {
+        double sum = 0;
+        for (const auto &item : std::as_const(m_data))
+            if (liquidSubTypes.contains(item.subType)) sum += item.currentValue;
+        return sum;
+    }
+
+    Q_INVOKABLE double getIlliquidValue(const QStringList &illiquidSubTypes) const {
+        double sum = 0;
+        for (const auto &item : std::as_const(m_data))
+            if (illiquidSubTypes.contains(item.subType)) sum += item.currentValue;
+        return sum;
+    }
+
+    // Returns name/isLiquid/value for all portfolio items linked to goalName,
+    // for use by RetirementAssetModel::syncPortfolioAssets()
+    Q_INVOKABLE QVariantList getAssetsForGoal(const QString &goalName) const {
+        static const QStringList liquidSubTypes = {
+            "Stock","Mutual Fund","ETF","FD/RD","Bond","Fund",
+            "Cash & Savings","REITs","Digital","ETF/Fund","Crypto"
+        };
+        QVariantList result;
+        for (const auto &item : std::as_const(m_data)) {
+            if (item.goalLink != goalName) continue;
+            QVariantMap m;
+            m["name"]      = item.name;
+            m["isLiquid"]  = liquidSubTypes.contains(item.subType);
+            m["value"]     = item.currentValue;
+            m["assetType"] = item.assetType;
+            result << m;
+        }
+        return result;
+    }
+
     // Helper for GoalModel
-    double getFundedAmountForGoal(const QString &goalName) {
+    Q_INVOKABLE double getFundedAmountForGoal(const QString &goalName) {
         double sum = 0;
         for (const auto &item : std::as_const(m_data)) {
             if (item.goalLink == goalName) sum += item.currentValue;

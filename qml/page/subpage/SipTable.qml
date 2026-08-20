@@ -147,13 +147,16 @@ Item {
                     }
 
                     CustomComboBox {
+                        id: subTypeCombo
                         visible: filterType !== "Crypto"
                         Layout.preferredWidth: colType
                         model: {
-                            if (filterType === "Equity") return ["Stock", "Mutual Fund", "ETF"]
-                            if (filterType === "Debt") return ["FD/RD", "Bond", "Fund", "Govt. Scheme"]
-                            if (filterType === "Real Estate") return ["Residential", "Commercial", "REITs"]
-                            return ["Physical", "Digital", "ETF"]
+                            var t = filterType
+                            if (t === "Equity")      return ["Stock", "Mutual Fund", "ETF", "ESOPs", "Private"]
+                            if (t === "Debt")        return ["FD/RD", "Bond", "Fund", "Cash & Savings", "Govt. Scheme"]
+                            if (t === "Real Estate") return ["Residential", "Commercial", "REITs"]
+                            if (t === "Commodity")   return ["Physical", "Digital", "ETF/Fund"]
+                            return []
                         }
                         currentIndex: find(subType)
                         onActivated: subType = currentText
@@ -170,14 +173,8 @@ Item {
                     CustomComboBox {
                         Layout.preferredWidth: colGoal
                         model: goalModel.goalNamesWithNone
-
-                        // Set index: find the current goalLink in the list of names
-                        currentIndex: find(model.goalLink)
-
-                        onActivated: {
-                            // If "- None -" is picked, we store it as an empty string to "unselect"
-                            model.goalLink = (currentText === "- None -") ? "" : currentText
-                        }
+                        currentIndex: find(goalLink)
+                        onActivated: goalLink = (currentText === "- None -") ? "" : currentText
                     }
 
                     // SIP Value

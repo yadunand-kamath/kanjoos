@@ -71,8 +71,8 @@ Window {
 
             NavButton { text: qsTr("Overview") }
             NavButton { text: qsTr("Cash Flow") }
-            NavButton { text: qsTr("Safety net") }
-            NavButton { text: qsTr("SIP Planner") }
+            NavButton { text: qsTr("Safety Net") }
+            NavButton { text: qsTr("Planner") }
             NavButton { text: qsTr("Portfolio") }
         }
 

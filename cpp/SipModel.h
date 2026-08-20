@@ -79,7 +79,7 @@ public:
     Q_INVOKABLE void addEntry(QString type) {
         int row = m_data.count();
         beginInsertRows(QModelIndex(), row, row);
-        m_data << SipItem{type, "New " + type, "Domestic", "Other", "-", "None", 0.0};
+        m_data << SipItem{type, "New " + type, "Domestic", "Other", "-", "", 0.0};
         endInsertRows();
         emit sipUpdated();
     }
@@ -88,8 +88,35 @@ public:
         beginRemoveRows(parent, row, row + count - 1);
         m_data.removeAt(row);
         endRemoveRows();
-        emit sipUpdated(); // Force Goals table to refresh
+        emit sipUpdated();
         return true;
+    }
+
+    // Called by SipFilterProxy::removeRow via QMetaObject::invokeMethod
+    Q_INVOKABLE void removeEntry(int row) {
+        if (row < 0 || row >= m_data.count()) return;
+        removeRows(row, 1);
+    }
+
+    // Remove all entries of a specific asset type
+    Q_INVOKABLE void clearAsset(const QString &type) {
+        for (int i = m_data.count() - 1; i >= 0; --i) {
+            if (m_data[i].assetType == type) {
+                beginRemoveRows(QModelIndex(), i, i);
+                m_data.removeAt(i);
+                endRemoveRows();
+            }
+        }
+        emit sipUpdated();
+    }
+
+    // Remove all SIP entries
+    Q_INVOKABLE void clearAll() {
+        if (m_data.isEmpty()) return;
+        beginResetModel();
+        m_data.clear();
+        endResetModel();
+        emit sipUpdated();
     }
 
     Q_INVOKABLE double getTotal(QString type) {

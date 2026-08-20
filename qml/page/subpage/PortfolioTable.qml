@@ -47,8 +47,22 @@ Item {
         }
 
         ListView {
-            id: portListView // ADD ID
+            id: portListView
             Layout.fillWidth: true; Layout.fillHeight: true; clip: true; model: proxy
+            boundsBehavior: Flickable.StopAtBounds
+            rightMargin: 12
+
+            ScrollBar.vertical: ScrollBar {
+                id: portScrollBar
+                active: true
+                policy: ScrollBar.AsNeeded
+                contentItem: Rectangle {
+                    implicitWidth: 4; implicitHeight: 100; radius: 2
+                    color: portScrollBar.pressed ? tableRoot.accent : "#333"
+                    Behavior on color { ColorAnimation { duration: 200 } }
+                }
+                background: Rectangle { implicitWidth: 4; color: "transparent" }
+            }
 
             delegate: Rectangle {
                 // FIX: Use ID instead of parent to avoid null width crash
@@ -78,10 +92,12 @@ Item {
                         visible: filterType !== "Crypto"
                         Layout.preferredWidth: colType
                         model: {
-                            if (filterType === "Equity") return ["Stock", "Mutual Fund", "ETF", "ESOPs"]
-                            if (filterType === "Debt") return ["FD/RD", "Bond", "Fund", "Govt. Scheme"]
-                            if (filterType === "Real Estate") return ["Residential", "Commercial", "REITs"]
-                            return ["Physical", "Digital", "ETF/Fund", "Other"]
+                            var t = filterType
+                            if (t === "Equity")      return ["Stock", "Mutual Fund", "ETF", "ESOPs", "Private"]
+                            if (t === "Debt")        return ["FD/RD", "Bond", "Fund", "Cash & Savings", "Govt. Scheme"]
+                            if (t === "Real Estate") return ["Residential", "Commercial", "REITs"]
+                            if (t === "Commodity")   return ["Physical", "Digital", "ETF/Fund"]
+                            return []
                         }
                         currentIndex: find(model.subType); onActivated: model.subType = currentText
                     }
@@ -94,22 +110,53 @@ Item {
                         currentIndex: find(model.category); onActivated: model.category = currentText
                     }
 
-                    TextInput {
-                        text: model.invested === 0 ? "" : Number(model.invested).toFixed(0) // Prevents 2e+05
-                        color: "#999"; Layout.preferredWidth: colInvested; horizontalAlignment: Text.AlignRight
-                        font.bold: true
-                        onTextEdited: {
-                            let val = parseFloat(text)
-                            model.invested = isNaN(val) ? 0 : val
+                    // Invested — underline on focus/hover so the field is discoverable
+                    Item {
+                        Layout.preferredWidth: colInvested
+                        implicitHeight: investedInput.implicitHeight + 2
+
+                        TextInput {
+                            id: investedInput
+                            anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter }
+                            text: model.invested === 0 ? "" : Number(model.invested).toFixed(0)
+                            color: "#999"; font.bold: true
+                            horizontalAlignment: Text.AlignRight
+                            selectByMouse: true
+                            mouseSelectionMode: TextInput.SelectCharacters
+                            onTextEdited: { let v = parseFloat(text); model.invested = isNaN(v) ? 0 : v }
+                        }
+                        Rectangle {
+                            anchors.bottom: parent.bottom; width: parent.width; height: 1
+                            color: investedInput.activeFocus ? "#a29bfe" : (invHoverMA.containsMouse ? "#444" : "transparent")
+                        }
+                        MouseArea {
+                            id: invHoverMA; anchors.fill: parent; hoverEnabled: true
+                            acceptedButtons: Qt.NoButton; cursorShape: Qt.IBeamCursor
                         }
                     }
 
-                    TextInput {
-                        text: model.currentValue === 0 ? "" : Number(model.currentValue).toFixed(0) // Prevents 2e+05
-                        color: "white"; font.bold: true; Layout.preferredWidth: colValue; horizontalAlignment: Text.AlignRight
-                        onTextEdited: {
-                            let val = parseFloat(text)
-                            model.currentValue = isNaN(val) ? 0 : val
+                    // Current Value — same underline treatment
+                    Item {
+                        Layout.preferredWidth: colValue
+                        implicitHeight: valueInput.implicitHeight + 2
+
+                        TextInput {
+                            id: valueInput
+                            anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter }
+                            text: model.currentValue === 0 ? "" : Number(model.currentValue).toFixed(0)
+                            color: "white"; font.bold: true
+                            horizontalAlignment: Text.AlignRight
+                            selectByMouse: true
+                            mouseSelectionMode: TextInput.SelectCharacters
+                            onTextEdited: { let v = parseFloat(text); model.currentValue = isNaN(v) ? 0 : v }
+                        }
+                        Rectangle {
+                            anchors.bottom: parent.bottom; width: parent.width; height: 1
+                            color: valueInput.activeFocus ? "#00d2ff" : (valHoverMA.containsMouse ? "#444" : "transparent")
+                        }
+                        MouseArea {
+                            id: valHoverMA; anchors.fill: parent; hoverEnabled: true
+                            acceptedButtons: Qt.NoButton; cursorShape: Qt.IBeamCursor
                         }
                     }
 
@@ -122,14 +169,8 @@ Item {
                     CustomComboBox {
                         Layout.preferredWidth: colGoal
                         model: goalModel.goalNamesWithNone
-
-                        // Set index: find the current goalLink in the list of names
-                        currentIndex: find(model.goalLink)
-
-                        onActivated: {
-                            // If "- None -" is picked, we store it as an empty string to "unselect"
-                            model.goalLink = (currentText === "- None -") ? "" : currentText
-                        }
+                        currentIndex: find(goalLink)
+                        onActivated: goalLink = (currentText === "- None -") ? "" : currentText
                     }
 
                     ToolButton {
