@@ -182,7 +182,6 @@ Rectangle {
             // --- SUB PAGE 3: RETIREMENT ---
             Retirement {
                 id: retirementSubPage
-                readonly property bool isReady: (typeof retirementCalc !== "undefined" && retirementCalc !== null)
             }
         }
     }

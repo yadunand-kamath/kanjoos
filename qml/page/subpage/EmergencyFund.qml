@@ -10,9 +10,21 @@ Item {
     Layout.fillHeight: true
 
     // ── PROPERTIES ────────────────────────────────────────────────────────────
-    property real currentSavings: parseFloat(savingsInput.text) || 0
+    property real manualSavings: parseFloat(savingsInput.text) || 0
+    property real linkedPortfolioValue: 0
+    readonly property real currentSavings: manualSavings + linkedPortfolioValue
     property int  multiplierIndex: 0
     property string lastUpdated: ""
+
+    // Sum current value of any portfolio assets linked to the "Emergency Fund" goal
+    function syncPortfolio() {
+        linkedPortfolioValue = portfolioModel.getFundedAmountForGoal("Emergency Fund")
+    }
+    Component.onCompleted: syncPortfolio()
+    Connections {
+        target: portfolioModel
+        function onPortfolioUpdated() { emergencyFundRoot.syncPortfolio() }
+    }
 
     // Use CashFlow income when not in Custom mode; custom salary field otherwise
     readonly property real activeSalary:     multiplierIndex === 2
@@ -91,12 +103,20 @@ Item {
                     }
                 }
             }
+
+            Text {
+                visible: emergencyFundRoot.linkedPortfolioValue > 0
+                text: "+ " + root.currencySymbol + " " + emergencyFundRoot.linkedPortfolioValue.toLocaleString(Qt.locale(), 'f', 0) + " linked from Portfolio"
+                color: "#43e97b"; font.pixelSize: 10
+                Layout.alignment: Qt.AlignHCenter
+            }
         }
 
         // ── HERO PERCENTAGE ───────────────────────────────────────────────────
         // Fills with color based on progress; shows raw ratio so overfunding is visible
         Column {
             Layout.alignment: Qt.AlignHCenter
+            Layout.topMargin: -20
             spacing: 0
 
             Item {
@@ -156,9 +176,16 @@ Item {
         // ── MULTIPLIER SETTINGS ───────────────────────────────────────────────
         ColumnLayout {
             Layout.alignment: Qt.AlignHCenter
-            Layout.topMargin: 20
-            Layout.bottomMargin: 10
+            Layout.topMargin: 12
+            Layout.bottomMargin: 6
             spacing: 8
+
+            // Context label so the buttons are self-explanatory
+            Text {
+                text: "MONTHS OF BASE INCOME TO SAVE AS BUFFER"
+                color: "#555"; font.pixelSize: 10; font.letterSpacing: 1
+                Layout.alignment: Qt.AlignHCenter
+            }
 
             RowLayout {
                 Layout.alignment: Qt.AlignHCenter
@@ -168,7 +195,7 @@ Item {
                 Row {
                     spacing: 5
                     Repeater {
-                        model: ["x 6 months", "x 12 months", "Custom"]
+                        model: ["x6 months", "x12 months", "Custom"]
                         Button {
                             text: modelData
                             flat: true
@@ -239,8 +266,8 @@ Item {
         // ── PROGRESS BAR & STATS ──────────────────────────────────────────────
         ColumnLayout {
             Layout.fillWidth: true
-            Layout.topMargin: 20
-            spacing: 20
+            Layout.topMargin: 12
+            spacing: 14
 
             ProgressBar {
                 id: mainBar
@@ -281,9 +308,8 @@ Item {
                         text: targetAmount > 0
                               ? root.currencySymbol + " " + targetAmount.toLocaleString(Qt.locale(), 'f', 0)
                               : "Enter Income in CashFlow or use Custom"
-                        color: targetAmount > 0 ? "#4CAF50" : "#555"
+                        color: targetAmount > 0 ? "#43e97b" : "#555"
                         font.pixelSize: 18; font.bold: true
-                        Behavior on color { ColorAnimation { duration: 400 } }
                     }
                 }
 
@@ -305,9 +331,10 @@ Item {
                         Layout.alignment: Qt.AlignRight
                     }
                     Text {
-                        text: runwayMonths > 0
-                              ? runwayMonths.toFixed(1) + " months"
-                              : "Enter Expenses in CashFlow"
+                        text: runwayMonths > 0 ? runwayMonths.toFixed(1) + " months"
+                                : root.globalMonthlyExpense <= 0
+                                ? "Enter Expenses in CashFlow"
+                                : "Enter Saved Amount or Link in Portfolio"
                         color: runwayMonths > 0 ? "#2196F3" : "#555"
                         font.pixelSize: 18; font.bold: true
                         Layout.alignment: Qt.AlignRight
@@ -315,13 +342,21 @@ Item {
                 }
             }
 
+            // ── FOOTER DIVIDER ───────────────────────────────────────────────────
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.topMargin: -8
+                height: 1; color: "#555"
+            }
+
             // ── BUTTONS + LAST UPDATED ────────────────────────────────────────
             // Buttons centered; timestamp anchored to bottom-left
             Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 40
+                Layout.preferredHeight: 34
+                Layout.topMargin: -8
 
-                // Timestamp at bottom-left
+                // Timestamp — bottom-left
                 Text {
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
