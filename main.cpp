@@ -28,6 +28,18 @@ int main(int argc, char *argv[])
     RetirementAssetModel *retirementAssetModel = new RetirementAssetModel(&app);
     engine.rootContext()->setContextProperty("retirementAssetModel", retirementAssetModel);
 
+    // Keep the calculator's accumulated totals in sync with the asset model.
+    // Batched into one push per assetsChanged so total/liquid/lockedRatio are
+    // never briefly inconsistent with each other mid-recalculation.
+    auto pushAccumulated = [retirementCalc, retirementAssetModel]() {
+        retirementCalc->setAccumulated(retirementAssetModel->totalValue(),
+                                        retirementAssetModel->liquidValue(),
+                                        retirementAssetModel->lockedRatio());
+    };
+    QObject::connect(retirementAssetModel, &RetirementAssetModel::assetsChanged,
+                      retirementCalc, pushAccumulated);
+    pushAccumulated(); // seed initial state (ctor default would otherwise sit at 0 until the page loads)
+
     SipModel *sipModel = new SipModel(&app);
     GoalModel *goalModel = new GoalModel(&app);
 
