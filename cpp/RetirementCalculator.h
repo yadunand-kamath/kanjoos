@@ -200,8 +200,7 @@ private:
         // Verdict — first match wins.
         if (m_corpusAccumulated <= 0.0) {
             m_verdictLevel = 0;
-            m_verdictText  = "No retirement assets linked yet. Add assets below, or link "
-                              "portfolio holdings to the Retirement goal, to see your real progress.";
+            m_verdictText  = "No retirement assets linked yet. Link portfolio holdings to the Retirement goal, to see your real progress.";
         } else if (m_fundedRatio < 1.0) {
             m_verdictLevel = (m_fundedRatio < 0.5) ? 1 : 2;
             m_verdictText  = QString(

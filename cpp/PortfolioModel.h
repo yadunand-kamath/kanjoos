@@ -27,24 +27,24 @@ public:
 
     explicit PortfolioModel(QObject *parent = nullptr) : QAbstractListModel(parent) {
         // EQUITY
-        m_data << PortfolioItem{"Equity", "Bluechip Stocks", "Domestic", "Stock", "Largecap", 850000.0, 1120000.0, "Retirement"};
-        m_data << PortfolioItem{"Equity", "Nasdaq 100", "International", "ETF", "Largecap", 400000.0, 525000.0, "Retirement"};
-        m_data << PortfolioItem{"Equity", "Midcap Fund", "Domestic", "Mutual Fund", "Midcap", 200000.0, 185000.0, "Home Downpayment"};
+        // m_data << PortfolioItem{"Equity", "Bluechip Stocks", "Domestic", "Stock", "Largecap", 850000.0, 1120000.0, "Retirement"};
+        // m_data << PortfolioItem{"Equity", "Nasdaq 100", "International", "ETF", "Largecap", 400000.0, 525000.0, "Retirement"};
+        // m_data << PortfolioItem{"Equity", "Midcap Fund", "Domestic", "Mutual Fund", "Midcap", 200000.0, 185000.0, "Home Downpayment"};
 
-        // DEBT
-        m_data << PortfolioItem{"Debt", "HDFC Fixed Deposit", "Domestic", "FD/RD", "-", 500000.0, 535000.0, "Emergency Fund"};
-        m_data << PortfolioItem{"Debt", "Employee Provident Fund", "Domestic", "Govt. Scheme", "-", 1200000.0, 1200000.0, "Retirement"};
-        m_data << PortfolioItem{"Debt", "Sovereign Gold Bond", "Domestic", "Bond", "-", 150000.0, 180000.0, "World Tour"};
+        // // DEBT
+        // m_data << PortfolioItem{"Debt", "HDFC Fixed Deposit", "Domestic", "FD/RD", "-", 500000.0, 535000.0, "Emergency Fund"};
+        // m_data << PortfolioItem{"Debt", "Employee Provident Fund", "Domestic", "Govt. Scheme", "-", 1200000.0, 1200000.0, "Retirement"};
+        // m_data << PortfolioItem{"Debt", "Sovereign Gold Bond", "Domestic", "Bond", "-", 150000.0, 180000.0, "World Tour"};
 
-        // REAL ESTATE
-        m_data << PortfolioItem{"Real Estate", "Ancestral Land", "Domestic", "Other", "-", 2500000.0, 4800000.0, "Retirement"};
-        m_data << PortfolioItem{"Real Estate", "REIT - Embassy", "Domestic", "REITs", "-", 100000.0, 112000.0, "Home Downpayment"};
+        // // REAL ESTATE
+        // m_data << PortfolioItem{"Real Estate", "Ancestral Land", "Domestic", "Other", "-", 2500000.0, 4800000.0, "Retirement"};
+        // m_data << PortfolioItem{"Real Estate", "REIT - Embassy", "Domestic", "REITs", "-", 100000.0, 112000.0, "Home Downpayment"};
 
-        // COMMODITY
-        m_data << PortfolioItem{"Commodity", "Physical Gold", "Domestic", "Physical", "-", 250000.0, 380000.0, "Emergency Fund"};
+        // // COMMODITY
+        // m_data << PortfolioItem{"Commodity", "Physical Gold", "Domestic", "Physical", "-", 250000.0, 380000.0, "Emergency Fund"};
 
-        // CRYPTO
-        m_data << PortfolioItem{"Crypto", "Bitcoin", "-", "-", "-", 150000.0, 245000.0, "None"};
+        // // CRYPTO
+        // m_data << PortfolioItem{"Crypto", "Bitcoin", "-", "-", "-", 150000.0, 245000.0, "None"};
     }
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const override { return m_data.count(); }

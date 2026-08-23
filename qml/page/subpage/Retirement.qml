@@ -137,7 +137,12 @@ Rectangle {
                         spacing: 24
 
                         HeroMetric { label: "CORPUS NEEDED";  value: retirementRoot.fmtCr(retirementRoot.corpusNeeded); accent: "#ffffff" }
-                        HeroMetric { label: "ACCUMULATED";    value: retirementRoot.fmtCr(retirementRoot.accumulated);  accent: retirementRoot.progressColor }
+                        HeroMetric {
+                            label: "ACCUMULATED"
+                            value: retirementRoot.fmtCr(retirementRoot.accumulated)
+                            accent: retirementRoot.progressColor
+                            toolTip: "Sum of all assets linked to the \"Retirement\" goal in Portfolio"
+                        }
                         HeroMetric {
                             label: "SHORTFALL"
                             value: retirementRoot.shortfall > 0 ? retirementRoot.fmtCr(retirementRoot.shortfall) : "None"
@@ -204,10 +209,28 @@ Rectangle {
                                         retirementCalc.monthlyExpense = Math.max(0, retirementCalc.monthlyExpense - 1000)
                                     }
                                 }
-                                Text {
+                                TextField {
+                                    id: expenseInput
                                     text: retirementRoot.isReady ? retirementCalc.monthlyExpense.toLocaleString(Qt.locale(), 'f', 0) : "0"
                                     color: "white"; font.pixelSize: 18; font.weight: Font.Bold
                                     Layout.fillWidth: true; horizontalAlignment: Text.AlignHCenter
+                                    background: Item {}
+                                    selectByMouse: true
+                                    validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
+                                    onTextEdited: {
+                                        let pos      = cursorPosition;
+                                        let stripped = text.replace(/^0+(\d)/, '$1');
+                                        if (stripped !== text) {
+                                            let removed    = text.length - stripped.length;
+                                            text           = stripped;
+                                            cursorPosition = Math.max(0, pos - removed);
+                                        }
+                                    }
+                                    onEditingFinished: if (retirementRoot.isReady) {
+                                        let val = parseFloat(text.replace(/,/g, ""))
+                                        retirementRoot.expenseOverridden = true
+                                        retirementCalc.monthlyExpense = isNaN(val) ? 0 : val
+                                    }
                                 }
                                 Button {
                                     text: "+"; flat: true; palette.buttonText: "white"
@@ -389,7 +412,7 @@ Rectangle {
                 Text {
                     Layout.alignment: Qt.AlignHCenter
                     visible: retirementRoot.accumulated <= 0
-                    text: "ADD ASSETS TO SEE YOUR LIQUID / LOCKED SPLIT"
+                    text: "LINK ASSETS IN PORTFOLIO TO SEE YOUR LIQUID / LOCKED SPLIT"
                     color: "#555"; font.pixelSize: 10
                 }
                 Text {
@@ -469,21 +492,8 @@ Rectangle {
                     }
                     Text {
                         anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
-                        text: "Portfolio-linked rows auto-synced"
+                        text: "Link assets to \"Retirement\" in Portfolio to see them here"
                         color: "#999"; font.pixelSize: 12; font.italic: true
-                    }
-                    Rectangle {
-                        anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                        width: 76; height: 26; radius: 4
-                        color: addAssetMA.containsMouse ? "#222" : "transparent"
-                        border.color: "white"; border.width: 1
-                        Behavior on color { ColorAnimation { duration: 120 } }
-                        Text { anchors.centerIn: parent; text: "+ ADD"; color: "white"; font.pixelSize: 10; font.bold: true }
-                        MouseArea {
-                            id: addAssetMA; anchors.fill: parent; hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: retirementAssetModel.addAsset()
-                        }
                     }
                 }
 
@@ -600,7 +610,7 @@ Rectangle {
                                     editable: !model.fromPortfolio
                                     focusColor: rowAccent
                                     rightAligned: true
-                                    validator: DoubleValidator { bottom: 0 }
+                                    validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
                                     onEdited: (t) => retirementAssetModel.setValue(index, parseFloat(t) || 0)
                                 }
                             }
@@ -700,25 +710,44 @@ Rectangle {
         Rectangle { anchors.fill: parent; color: "#1a1a1a" }
     }
 
-    component HeroMetric : ColumnLayout {
+    component HeroMetric : Item {
+        id: heroMetricRoot
         property string label: ""
         property string value: ""
         property color accent: "white"
+        property string toolTip: ""
         Layout.fillWidth: true
-        spacing: 4
+        implicitHeight: metricColumn.implicitHeight
 
-        Text {
-            text: parent.label
-            color: "#757575"; font.pixelSize: 10; font.letterSpacing: 1.3
-            Layout.alignment: Qt.AlignHCenter
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
+        ColumnLayout {
+            id: metricColumn
+            anchors.left: parent.left; anchors.right: parent.right
+            spacing: 4
+
+            Text {
+                text: heroMetricRoot.label
+                color: "#757575"; font.pixelSize: 10; font.letterSpacing: 1.3
+                Layout.alignment: Qt.AlignHCenter
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+            Text {
+                text: heroMetricRoot.value
+                color: heroMetricRoot.accent; font.pixelSize: 20; font.weight: Font.Bold
+                Layout.alignment: Qt.AlignHCenter
+            }
         }
-        Text {
-            text: parent.value
-            color: parent.accent; font.pixelSize: 20; font.weight: Font.Bold
-            Layout.alignment: Qt.AlignHCenter
+
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            enabled: heroMetricRoot.toolTip !== ""
+            cursorShape: Qt.WhatsThisCursor
+            acceptedButtons: Qt.NoButton
+            ToolTip.visible: containsMouse && heroMetricRoot.toolTip !== ""
+            ToolTip.text: heroMetricRoot.toolTip
+            ToolTip.delay: 400
         }
     }
 
@@ -782,12 +811,21 @@ Rectangle {
         TextField {
             id: field
             anchors.left: parent.left; anchors.right: parent.right
-            color: "white"; font.pixelSize: 13
+            color: editable ? "white" : "#888"; font.pixelSize: 13
             leftPadding: rightAligned ? 0 : 4
             horizontalAlignment: rightAligned ? Text.AlignRight : Text.AlignLeft
             selectByMouse: true
             readOnly: !editable
             background: Rectangle { color: "transparent" }
+            onTextEdited: {
+                let pos      = cursorPosition;
+                let stripped = text.replace(/^0+(\d)/, '$1');
+                if (stripped !== text) {
+                    let removed    = text.length - stripped.length;
+                    text           = stripped;
+                    cursorPosition = Math.max(0, pos - removed);
+                }
+            }
             onEditingFinished: if (editable) edited(text)
         }
         Rectangle {

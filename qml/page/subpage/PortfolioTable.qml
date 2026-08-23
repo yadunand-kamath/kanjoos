@@ -39,7 +39,7 @@ Item {
                 HeaderLabel { text: "INSTRUMENT"; Layout.preferredWidth: colType; visible: filterType !== "Crypto" }
                 HeaderLabel { text: "CATEGORY"; Layout.preferredWidth: colCat; visible: filterType === "Equity" }
                 HeaderLabel { text: "INVESTED"; Layout.preferredWidth: colInvested; horizontalAlignment: Text.AlignRight }
-                HeaderLabel { text: "VALUE"; Layout.preferredWidth: colValue; horizontalAlignment: Text.AlignRight }
+                HeaderLabel { text: "CURRENT VALUE"; Layout.preferredWidth: colValue; horizontalAlignment: Text.AlignRight }
                 HeaderLabel { text: "RETURNS"; Layout.preferredWidth: colReturn; horizontalAlignment: Text.AlignRight }
                 HeaderLabel { text: "LINKED GOAL"; Layout.preferredWidth: colGoal }
                 Item { Layout.preferredWidth: 30 }
@@ -118,12 +118,28 @@ Item {
                         TextInput {
                             id: investedInput
                             anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter }
-                            text: model.invested === 0 ? "" : Number(model.invested).toFixed(0)
+                            text: model.invested === 0 ? ""
+                                    : activeFocus ? model.invested.toString()
+                                        : root.currencySymbol + Number(model.invested).toLocaleString(Qt.locale(), 'f', 0)
                             color: "#999"; font.bold: true
                             horizontalAlignment: Text.AlignRight
                             selectByMouse: true
                             mouseSelectionMode: TextInput.SelectCharacters
-                            onTextEdited: { let v = parseFloat(text); model.invested = isNaN(v) ? 0 : v }
+                            validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
+                            onActiveFocusChanged: {
+                                if (activeFocus) text = model.invested === 0 ? "" : model.invested.toString();
+                                else text = model.invested === 0 ? "" : root.currencySymbol + Number(model.invested).toLocaleString(Qt.locale(), 'f', 0)
+                            }
+                            onTextEdited: {
+                                let pos      = cursorPosition;
+                                let stripped = text.replace(/^0+(\d)/, '$1');
+                                if (stripped !== text) {
+                                    let removed    = text.length - stripped.length;
+                                    text           = stripped;
+                                    cursorPosition = Math.max(0, pos - removed);
+                                }
+                                let v = parseFloat(text); model.invested = isNaN(v) ? 0 : v
+                            }
                         }
                         Rectangle {
                             anchors.bottom: parent.bottom; width: parent.width; height: 1
@@ -143,12 +159,28 @@ Item {
                         TextInput {
                             id: valueInput
                             anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter }
-                            text: model.currentValue === 0 ? "" : Number(model.currentValue).toFixed(0)
+                            text: model.currentValue === 0 ? ""
+                                    : activeFocus ? model.currentValue.toString()
+                                        : root.currencySymbol + Number(model.currentValue).toLocaleString(Qt.locale(), 'f', 0)
                             color: "white"; font.bold: true
                             horizontalAlignment: Text.AlignRight
                             selectByMouse: true
                             mouseSelectionMode: TextInput.SelectCharacters
-                            onTextEdited: { let v = parseFloat(text); model.currentValue = isNaN(v) ? 0 : v }
+                            validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
+                            onActiveFocusChanged: {
+                                if (activeFocus) text = model.currentValue === 0 ? "" : model.currentValue.toString();
+                                else text = model.currentValue === 0 ? "" : root.currencySymbol + Number(model.currentValue).toLocaleString(Qt.locale(), 'f', 0)
+                            }
+                            onTextEdited: {
+                                let pos      = cursorPosition;
+                                let stripped = text.replace(/^0+(\d)/, '$1');
+                                if (stripped !== text) {
+                                    let removed    = text.length - stripped.length;
+                                    text           = stripped;
+                                    cursorPosition = Math.max(0, pos - removed);
+                                }
+                                let v = parseFloat(text); model.currentValue = isNaN(v) ? 0 : v
+                            }
                         }
                         Rectangle {
                             anchors.bottom: parent.bottom; width: parent.width; height: 1

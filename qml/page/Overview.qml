@@ -464,6 +464,13 @@ Rectangle {
                                 validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
                                 inputMethodHints: Qt.ImhFormattedNumbersOnly
                                 onTextEdited: {
+                                    let pos      = cursorPosition;
+                                    let stripped = text.replace(/^0+(\d)/, '$1');
+                                    if (stripped !== text) {
+                                        let removed    = text.length - stripped.length;
+                                        text           = stripped;
+                                        cursorPosition = Math.max(0, pos - removed);
+                                    }
                                     let v = parseFloat(text) || 0;
                                     liabilityModel.setProperty(index, "amount", v);
                                     overviewRoot.totalLiabilities = overviewRoot.sumLiabilities();

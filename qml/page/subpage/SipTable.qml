@@ -179,13 +179,27 @@ Item {
 
                     // SIP Value
                     TextInput {
-                        text: model.amount === 0 ? "" : model.amount.toString()
+                        id: sipValueInput
+                        text: model.amount === 0 ? ""
+                                : activeFocus ? model.amount.toString()
+                                    : root.currencySymbol + Number(model.amount).toLocaleString(Qt.locale(), 'f', 0)
                         color: accent
                         font.bold: true; font.family: "Monospace"; font.pixelSize: 13
                         Layout.preferredWidth: colSIP; horizontalAlignment: Text.AlignRight
                         Layout.alignment: Qt.AlignVCenter
-                        validator: DoubleValidator { bottom: 0 }
+                        validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
+                        onActiveFocusChanged: {
+                            if (activeFocus) text = model.amount === 0 ? "" : model.amount.toString();
+                            else text = model.amount === 0 ? "" : root.currencySymbol + Number(model.amount).toLocaleString(Qt.locale(), 'f', 0)
+                        }
                         onTextEdited: {
+                            let pos      = cursorPosition;
+                            let stripped = text.replace(/^0+(\d)/, '$1');
+                            if (stripped !== text) {
+                                let removed    = text.length - stripped.length;
+                                text           = stripped;
+                                cursorPosition = Math.max(0, pos - removed);
+                            }
                             let val = parseFloat(text)
                             model.amount = isNaN(val) ? 0 : val
                         }

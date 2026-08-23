@@ -201,6 +201,13 @@ Item {
                                 Layout.preferredWidth: colYears; horizontalAlignment: Text.AlignHCenter
                                 validator: IntValidator { bottom: 1; top: 100 }
                                 onTextEdited: {
+                                    let pos      = cursorPosition;
+                                    let stripped = text.replace(/^0+(\d)/, '$1');
+                                    if (stripped !== text) {
+                                        let removed    = text.length - stripped.length;
+                                        text           = stripped;
+                                        cursorPosition = Math.max(0, pos - removed);
+                                    }
                                     let val = parseInt(text)
                                     model.yearsLeft = isNaN(val) ? 0 : val
                                 }
@@ -218,12 +225,43 @@ Item {
                                 id: costInput
                                 // We use a property to track if the field is empty to help the "Clear" logic
                                 property bool isEmpty: text === ""
-                                text: model.currentCost === 0 ? "" : Number(model.currentCost).toFixed(0)
-                                color: "white"
+
+                                // Pull fund target values of Emergency fund and Retirement from respective pages
+                                readonly property bool isAutoCost: model.goalName === "Emergency Fund" || model.goalName === "Retirement"
+                                readonly property real autoCost: model.goalName === "Emergency Fund" ? root.emergencyFundTarget
+                                                                : model.goalName === "Retirement" ? retirementCalc.corpusNeeded
+                                                                : 0
+                                onAutoCostChanged: if (isAutoCost) model.currentCost = autoCost
+                                Component.onCompleted: if (isAutoCost) model.currentCost = autoCost
+
+                                text: model.currentCost === 0 ? ""
+                                            : activeFocus ? Number(model.currentCost).toFixed(0)
+                                                : root.currencySymbol + Number(model.currentCost).toLocaleString(Qt.locale(), 'f', 0)
+                                placeholderText: isAutoCost && model.currentCost === 0
+                                                     ? (model.goalName === "Emergency Fund" ? "Fill Emergency Fund page" : "Fill Retirement page")
+                                                     : ""
+                                toolTipText: isAutoCost
+                                                 ? (model.goalName === "Emergency Fund"
+                                                        ? "Auto-filled from Emergency Fund's target amount"
+                                                        : "Auto-filled from Retirement's corpus needed")
+                                                 : ""
+                                color: isAutoCost ? "#888" : "white"
+                                enabled: !isAutoCost
                                 Layout.preferredWidth: colCost
                                 horizontalAlignment: Text.AlignRight
-                                validator: DoubleValidator { bottom: 0 }
+                                validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
+                                onActiveFocusChanged: {
+                                    if (activeFocus) text = model.currentCost === 0 ? "" : Number(model.currentCost).toFixed(0)
+                                    else text = model.currentCost === 0 ? "" : root.currencySymbol + Number(model.currentCost).toLocaleString(Qt.locale(), 'f', 0)
+                                }
                                 onTextEdited: {
+                                    let pos      = cursorPosition;
+                                    let stripped = text.replace(/^0+(\d)/, '$1');
+                                    if (stripped !== text) {
+                                        let removed    = text.length - stripped.length;
+                                        text           = stripped;
+                                        cursorPosition = Math.max(0, pos - removed);
+                                    }
                                     let val = parseFloat(text)
                                     model.currentCost = isNaN(val) ? 0 : val
                                 }
@@ -232,14 +270,12 @@ Item {
                             // Available Today
                             GoalInput {
                                 id: availableInput
-                                text: model.currentFunded === 0 ? "" : Number(model.currentFunded).toFixed(0)
-                                color: "white"
+                                text: model.currentFunded === 0 ? "" : root.currencySymbol + Number(model.currentFunded).toLocaleString(Qt.locale(), 'f', 0)
+                                placeholderText: "Link in Portfolio"
+                                toolTipText: "Auto-filled from Portfolio assets linked to this goal"
+                                color: "#999"
+                                enabled: false
                                 Layout.preferredWidth: colFunded; horizontalAlignment: Text.AlignRight
-                                validator: DoubleValidator { bottom: 0 }
-                                onTextEdited: {
-                                    let val = parseFloat(text)
-                                    model.currentFunded = isNaN(val) ? 0 : val
-                                }
                             }
 
                             // Future Target
@@ -641,7 +677,7 @@ Item {
                         width: 70; height: 30
                         horizontalAlignment: Text.AlignHCenter
                         color: "white"
-                        validator: DoubleValidator { bottom: 0; top: 100 }
+                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
                         Layout.preferredWidth: 70; Layout.preferredHeight: 30
                         background: Rectangle {
                             color: "#222"; radius: 4
@@ -656,7 +692,7 @@ Item {
                         width: 70; height: 30
                         horizontalAlignment: Text.AlignHCenter
                         color: "white"
-                        validator: DoubleValidator { bottom: 0; top: 100 }
+                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
                         Layout.preferredWidth: 70; Layout.preferredHeight: 30
                         background: Rectangle {
                             color: "#222"; radius: 4
@@ -686,7 +722,7 @@ Item {
                         id: mInf; text: goalModel.medInf
                         horizontalAlignment: Text.AlignHCenter
                         color: "white"
-                        validator: DoubleValidator { bottom: 0; top: 100 }
+                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
                         Layout.preferredWidth: 70; Layout.preferredHeight: 30
                         background: Rectangle {
                             color: "#222"; radius: 4
@@ -700,7 +736,7 @@ Item {
                         id: mRet; text: goalModel.medRet
                         horizontalAlignment: Text.AlignHCenter
                         color: "white"
-                        validator: DoubleValidator { bottom: 0; top: 100 }
+                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
                         Layout.preferredWidth: 70; Layout.preferredHeight: 30
                         background: Rectangle {
                             color: "#222"; radius: 4
@@ -730,7 +766,7 @@ Item {
                         id: lInf; text: goalModel.longInf
                         horizontalAlignment: Text.AlignHCenter
                         color: "white"
-                        validator: DoubleValidator { bottom: 0; top: 100 }
+                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
                         Layout.preferredWidth: 70; Layout.preferredHeight: 30
                         background: Rectangle {
                             color: "#222"; radius: 4
@@ -744,7 +780,7 @@ Item {
                         id: lRet; text: goalModel.longRet
                         horizontalAlignment: Text.AlignHCenter
                         color: "white"
-                        validator: DoubleValidator { bottom: 0; top: 100 }
+                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
                         Layout.preferredWidth: 70; Layout.preferredHeight: 30
                         background: Rectangle {
                             color: "#222"; radius: 4
@@ -806,12 +842,25 @@ Item {
     }
 
     component GoalInput : TextInput {
+        id: goalInput
         color: "white"; font.pixelSize: 13
         selectByMouse: true          // allows click-drag selection
         mouseSelectionMode: TextInput.SelectCharacters
         cursorVisible: activeFocus
         verticalAlignment: Text.AlignVCenter
         clip: true
+
+        property string placeholderText: ""
+        property string toolTipText: ""
+
+        Text {
+            anchors.fill: parent
+            visible: goalInput.text === "" && goalInput.placeholderText !== ""
+            text: goalInput.placeholderText
+            color: "#555"; font.pixelSize: 11; font.italic: true
+            horizontalAlignment: goalInput.horizontalAlignment
+            verticalAlignment: Text.AlignVCenter
+        }
 
         // Underline that highlights on focus/hover
         Rectangle {
@@ -824,8 +873,12 @@ Item {
         MouseArea {
             id: underlineMA
             anchors.fill: parent; hoverEnabled: true
-            cursorShape: Qt.IBeamCursor
+            cursorShape: goalInput.enabled ? Qt.IBeamCursor : Qt.ArrowCursor
             acceptedButtons: Qt.NoButton  // pass all clicks through to TextInput
+
+            ToolTip.visible: goalInput.toolTipText !== "" && containsMouse
+            ToolTip.text: goalInput.toolTipText
+            ToolTip.delay: 400
         }
     }
 }

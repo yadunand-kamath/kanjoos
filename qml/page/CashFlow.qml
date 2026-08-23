@@ -130,18 +130,47 @@ Rectangle {
 
         property real value: 0
         onValueChanged: {
-            if (value === 0 && input.text !== "") input.text = "";
+            if (input.activeFocus) return;
+            input.text = value === 0 ? "" : value.toLocaleString(Qt.locale(), 'f', 0);
         }
 
         signal amountChanged(real value)
         signal removeRequested()
+        signal labelEdited(string value)
 
-        // Label column — fixed width so all fields line up
-        Text {
-            text: label
-            color: "#aaa"; font.pixelSize: 13
+        // Label column — fixed width so all fields line up.
+        // Custom (removable) rows get an editable name; the 4 fixed
+        // categories per card stay as plain, non-editable labels.
+        Item {
             Layout.preferredWidth: 80
-            elide: Text.ElideRight
+            implicitHeight: removable ? labelInput.implicitHeight : labelText.implicitHeight
+
+            Text {
+                id: labelText
+                visible: !removable
+                text: label
+                color: "#aaa"; font.pixelSize: 13
+                width: parent.width
+                elide: Text.ElideRight
+            }
+
+            TextInput {
+                id: labelInput
+                visible: removable
+                text: label
+                color: "#aaa"; font.pixelSize: 13
+                width: parent.width
+                clip: true
+                selectByMouse: true
+
+                Text {
+                    visible: labelInput.text === ""
+                    text: "Category"
+                    color: "#555"; font.pixelSize: 13; font.italic: true
+                }
+
+                onEditingFinished: inputRowRoot.labelEdited(text)
+            }
         }
 
         // Number input with ₹ prefix overlay
@@ -152,6 +181,11 @@ Rectangle {
             Layout.fillWidth: true
             leftPadding: 28
             inputMethodHints: Qt.ImhFormattedNumbersOnly
+
+            onActiveFocusChanged: {
+                if (activeFocus) text = inputRowRoot.value === 0 ? "" : String(inputRowRoot.value);
+                else text = inputRowRoot.value === 0 ? "" : inputRowRoot.value.toLocaleString(Qt.locale(), 'f', 0);
+            }
 
             onTextEdited: {
                 // Strip leading zeros while preserving valid decimals (e.g. "0.5").
@@ -249,6 +283,7 @@ Rectangle {
                             value: model.amount
                             onAmountChanged:  (val) => { incomeModel.setProperty(index, "amount", val); }
                             onRemoveRequested: incomeModel.remove(index)
+                            onLabelEdited: (val) => { incomeModel.setProperty(index, "label", val); }
                         }
                     }
 
@@ -269,7 +304,7 @@ Rectangle {
 
                             MouseArea {
                                 id: addIncomeArea; anchors.fill: parent; hoverEnabled: true
-                                onClicked: incomeModel.append({ label: "Custom", placeholder: "0", amount: 0 })
+                                onClicked: incomeModel.append({ label: "", placeholder: "0", amount: 0 })
                             }
                         }
 
@@ -431,6 +466,7 @@ Rectangle {
                             value: model.amount
                             onAmountChanged:   (val) => { expenseModel.setProperty(index, "amount", val); }
                             onRemoveRequested: expenseModel.remove(index)
+                            onLabelEdited: (val) => { expenseModel.setProperty(index, "label", val); }
                         }
                     }
 
@@ -451,7 +487,7 @@ Rectangle {
 
                             MouseArea {
                                 id: addExpenseArea; anchors.fill: parent; hoverEnabled: true
-                                onClicked: expenseModel.append({ label: "Custom", placeholder: "0", amount: 0 })
+                                onClicked: expenseModel.append({ label: "", placeholder: "0", amount: 0 })
                             }
                         }
 

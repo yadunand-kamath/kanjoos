@@ -55,8 +55,8 @@ public:
         m_data << GoalItem{2, "Retirement", 25, 2000000.0, 0.0};
 
         // Dummy data
-        m_data << GoalItem{3, "Home Downpayment", 5, 2500000.0, 0.0};
-        m_data << GoalItem{4, "World Tour", 3, 1000000.0, 0.0};
+        // m_data << GoalItem{3, "Home Downpayment", 5, 2500000.0, 0.0};
+        // m_data << GoalItem{4, "World Tour", 3, 1000000.0, 0.0};
 
         updateTotals();
     }

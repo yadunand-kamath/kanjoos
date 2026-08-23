@@ -10,9 +10,8 @@ Item {
     Layout.fillHeight: true
 
     // ── PROPERTIES ────────────────────────────────────────────────────────────
-    property real manualSavings: parseFloat(savingsInput.text) || 0
     property real linkedPortfolioValue: 0
-    readonly property real currentSavings: manualSavings + linkedPortfolioValue
+    readonly property real currentSavings: linkedPortfolioValue
     property int  multiplierIndex: 0
     property string lastUpdated: ""
 
@@ -77,38 +76,38 @@ Item {
                 Layout.alignment: Qt.AlignHCenter
             }
 
-            TextField {
-                id: savingsInput
-                placeholderText: "0"
-                color: "white"
-                font.pixelSize: 30; font.bold: true
-                horizontalAlignment: Text.AlignHCenter
-                Layout.preferredWidth: 275
-                leftPadding: 40
-
-                validator: DoubleValidator { bottom: 0 }
-                // Strip leading zeros but allow "0." for decimals
-                onTextEdited: if (text.length > 1 && text.startsWith("0") && !text.startsWith("0."))
-                                  text = text.replace(/^0+/, '')
-
-                background: Rectangle {
-                    color: "transparent"
-                    border.color: savingsInput.activeFocus ? "#FFFFFF" : "#222"
-                    border.width: 1; radius: 12; implicitHeight: 50
-
-                    Text {
-                        text: root.currencySymbol; color: "#333"; font.pixelSize: 30
-                        anchors.left: parent.left; anchors.leftMargin: 20
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
-            }
-
-            Text {
-                visible: emergencyFundRoot.linkedPortfolioValue > 0
-                text: "+ " + root.currencySymbol + " " + emergencyFundRoot.linkedPortfolioValue.toLocaleString(Qt.locale(), 'f', 0) + " linked from Portfolio"
-                color: "#43e97b"; font.pixelSize: 10
+            Rectangle {
+                id: savingsBox
+                Layout.preferredWidth: 275; Layout.preferredHeight: 50
                 Layout.alignment: Qt.AlignHCenter
+                color: "transparent"; border.color: "#222"; border.width: 1; radius: 12
+
+                Text {
+                    anchors.centerIn: parent
+                    visible: emergencyFundRoot.linkedPortfolioValue > 0
+                    text: root.currencySymbol + " " + emergencyFundRoot.currentSavings.toLocaleString(Qt.locale(), 'f', 0)
+                    color: "white"; font.pixelSize: 30; font.bold: true
+                }
+
+                Text {
+                    anchors.centerIn: parent
+                    anchors.margins: 8
+                    width: parent.width - 16
+                    visible: emergencyFundRoot.linkedPortfolioValue === 0
+                    text: "Link an asset in Portfolio"
+                    color: "#555"; font.pixelSize: 14; font.italic: true
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.WhatsThisCursor
+                    ToolTip.visible: containsMouse
+                    ToolTip.delay: 400
+                    ToolTip.text: "This amount is linked from Portfolio assets assigned to the \"Emergency Fund\" goal"
+                }
             }
         }
 
@@ -195,7 +194,13 @@ Item {
                 Row {
                     spacing: 5
                     Repeater {
+                        id: multiplierRepeater
                         model: ["x6 months", "x12 months", "Custom"]
+                        readonly property var tips: [
+                            "Protect yourself for 6 months",
+                            "Protect yourself for 12 months",
+                            ""
+                        ]
                         Button {
                             text: modelData
                             flat: true
@@ -203,6 +208,11 @@ Item {
                             palette.buttonText: multiplierIndex === index ? "#ECEFF1" : "#555"
                             font.bold: multiplierIndex === index
                             onClicked: multiplierIndex = index
+
+                            hoverEnabled: true
+                            ToolTip.visible: hovered && multiplierRepeater.tips[index] !== ""
+                            ToolTip.delay: 400
+                            ToolTip.text: multiplierRepeater.tips[index]
 
                             background: Rectangle {
                                 color: multiplierIndex === index ? "#252525" : "transparent"
@@ -221,18 +231,26 @@ Item {
                     // Custom multiplier (months)
                     TextField {
                         id: customInput; text: "15"
-                        Layout.preferredWidth: 70; font.pixelSize: 13
+                        Layout.preferredWidth: 100; font.pixelSize: 13
                         horizontalAlignment: Text.AlignLeft
                         leftPadding: 10; rightPadding: 26
-                        placeholderText: "months"
-                        validator: DoubleValidator { bottom: 1 }
-                        onTextEdited: text = text.replace(/^0+/, '')
+                        placeholderText: ""
+                        validator: DoubleValidator { bottom: 1; top: 60; notation: DoubleValidator.StandardNotation }
+                        onTextEdited: {
+                            let pos      = cursorPosition;
+                            let stripped = text.replace(/^0+(\d)/, '$1');
+                            if (stripped !== text) {
+                                let removed    = text.length - stripped.length;
+                                text           = stripped;
+                                cursorPosition = Math.max(0, pos - removed);
+                            }
+                        }
 
                         background: Rectangle {
                             color: "#111"; radius: 4; implicitHeight: 36
                             border.color: customInput.activeFocus ? "#FFFFFF" : "#333"; border.width: 1
                             Text {
-                                text: "x"; color: "#666"
+                                text: "months x"; color: "#666"
                                 anchors.right: parent.right; anchors.rightMargin: 8
                                 anchors.verticalCenter: parent.verticalCenter
                             }
@@ -241,13 +259,21 @@ Item {
 
                     // Custom monthly income override
                     TextField {
-                        id: salaryInput; text: root.globalMonthlyIncome.toString()
-                        Layout.preferredWidth: 120; leftPadding: 26
+                        id: salaryInput; text: globalMonthlyIncome === 0 ? "" : root.globalMonthlyIncome.toString()
+                        Layout.preferredWidth: 140; leftPadding: 26
                         color: "white"; font.pixelSize: 13
                         horizontalAlignment: Text.AlignLeft
                         placeholderText: "Monthly income"
-                        validator: DoubleValidator { bottom: 0 }
-                        onTextEdited: text = text.replace(/^0+/, '')
+                        validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
+                        onTextEdited: {
+                            let pos      = cursorPosition;
+                            let stripped = text.replace(/^0+(\d)/, '$1');
+                            if (stripped !== text) {
+                                let removed    = text.length - stripped.length;
+                                text           = stripped;
+                                cursorPosition = Math.max(0, pos - removed);
+                            }
+                        }
 
                         background: Rectangle {
                             color: "#111"; radius: 4; implicitHeight: 36
@@ -364,7 +390,7 @@ Item {
                     color: "#444"; font.pixelSize: 10; font.italic: true
                 }
 
-                // Save + Clear centered
+                // Save centered
                 Row {
                     anchors.centerIn: parent
                     spacing: 12
@@ -373,15 +399,6 @@ Item {
                         id: saveButton
                         onClicked: {
                             lastUpdated = Qt.formatDateTime(new Date(), "dd MMM yyyy, hh:mm")
-                        }
-                    }
-
-                    ClearButton {
-                        id: clearButton
-                        text: "Clear"
-                        onClicked: {
-                            savingsInput.text = ""
-                            multiplierIndex = 0
                         }
                     }
                 }
