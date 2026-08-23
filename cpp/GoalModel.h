@@ -3,6 +3,7 @@
 
 #include <QAbstractListModel>
 #include <QVector>
+#include <algorithm>
 #include <cmath>
 #include <QDebug>
 
@@ -54,8 +55,8 @@ public:
         m_data << GoalItem{2, "Retirement", 25, 2000000.0, 0.0};
 
         // Dummy data
-        m_data << GoalItem{3, "Home Downpayment", 5, 2500000.0, 0.0};
-        m_data << GoalItem{4, "World Tour", 3, 1000000.0, 0.0};
+        // m_data << GoalItem{3, "Home Downpayment", 5, 2500000.0, 0.0};
+        // m_data << GoalItem{4, "World Tour", 3, 1000000.0, 0.0};
 
         updateTotals();
     }
@@ -192,6 +193,19 @@ public:
         emit goalNamesChanged();
     }
 
+    // Reset all goal data to blank defaults (keeps protected goals, zeroes their fields)
+    Q_INVOKABLE void clearAll() {
+        beginResetModel();
+        // Remove user-added goals, zero out protected ones
+        m_data.erase(std::remove_if(m_data.begin(), m_data.end(), [](const GoalItem &g) {
+            return g.goalName != "Emergency Fund" && g.goalName != "Retirement";
+        }), m_data.end());
+        for (auto &g : m_data) { g.yearsLeft = 0; g.currentCost = 0; g.currentFunded = 0; }
+        endResetModel();
+        updateTotals();
+        emit goalNamesChanged();
+    }
+
     Q_INVOKABLE void removeGoal(int index) {
         if (index < 1 || index >= m_data.count()) return;
 
@@ -206,6 +220,18 @@ public:
         endRemoveRows();
         updateTotals();
         emit goalNamesChanged();
+    }
+
+    // Returns currentFunded / currentCost (0–1), used by Overview progress bars
+    Q_INVOKABLE double getGoalFundedRatio(const QString &goalName) const {
+        for (const auto &item : std::as_const(m_data)) {
+            if (item.goalName == goalName) {
+                double funded = m_portfolioModel ? m_portfolioModel->getFundedAmountForGoal(item.goalName) : item.currentFunded;
+                if (item.currentCost <= 0) return 0.0;
+                return std::min(1.0, std::max(0.0, funded / item.currentCost));
+            }
+        }
+        return 0.0;
     }
 
     Q_INVOKABLE double getGoalCoverage(const QString &goalName) const {

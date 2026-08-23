@@ -8,6 +8,10 @@ Rectangle {
     id: safetyNetRoot
     color: "#121212"
 
+    // Properties
+    property alias emergencyFundSubPage: emergencyFundSubPage
+    property alias retirementSubPage: retirementSubPage
+
     // Info Title
     function getInfoTitle() {
         if (safetyStack.currentIndex === 0) return "Emergency Fund"
@@ -182,7 +186,6 @@ Rectangle {
             // --- SUB PAGE 3: RETIREMENT ---
             Retirement {
                 id: retirementSubPage
-                readonly property bool isReady: (typeof retirementCalc !== "undefined" && retirementCalc !== null)
             }
         }
     }

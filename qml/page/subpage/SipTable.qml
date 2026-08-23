@@ -147,13 +147,16 @@ Item {
                     }
 
                     CustomComboBox {
+                        id: subTypeCombo
                         visible: filterType !== "Crypto"
                         Layout.preferredWidth: colType
                         model: {
-                            if (filterType === "Equity") return ["Stock", "Mutual Fund", "ETF"]
-                            if (filterType === "Debt") return ["FD/RD", "Bond", "Fund", "Govt. Scheme"]
-                            if (filterType === "Real Estate") return ["Residential", "Commercial", "REITs"]
-                            return ["Physical", "Digital", "ETF"]
+                            var t = filterType
+                            if (t === "Equity")      return ["Stock", "Mutual Fund", "ETF", "ESOPs", "Private"]
+                            if (t === "Debt")        return ["FD/RD", "Bond", "Fund", "Cash & Savings", "Govt. Scheme"]
+                            if (t === "Real Estate") return ["Residential", "Commercial", "REITs"]
+                            if (t === "Commodity")   return ["Physical", "Digital", "ETF/Fund"]
+                            return []
                         }
                         currentIndex: find(subType)
                         onActivated: subType = currentText
@@ -170,25 +173,33 @@ Item {
                     CustomComboBox {
                         Layout.preferredWidth: colGoal
                         model: goalModel.goalNamesWithNone
-
-                        // Set index: find the current goalLink in the list of names
-                        currentIndex: find(model.goalLink)
-
-                        onActivated: {
-                            // If "- None -" is picked, we store it as an empty string to "unselect"
-                            model.goalLink = (currentText === "- None -") ? "" : currentText
-                        }
+                        currentIndex: find(goalLink)
+                        onActivated: goalLink = (currentText === "- None -") ? "" : currentText
                     }
 
                     // SIP Value
                     TextInput {
-                        text: model.amount === 0 ? "" : model.amount.toString()
+                        id: sipValueInput
+                        text: model.amount === 0 ? ""
+                                : activeFocus ? model.amount.toString()
+                                    : root.currencySymbol + Number(model.amount).toLocaleString(Qt.locale(), 'f', 0)
                         color: accent
                         font.bold: true; font.family: "Monospace"; font.pixelSize: 13
                         Layout.preferredWidth: colSIP; horizontalAlignment: Text.AlignRight
                         Layout.alignment: Qt.AlignVCenter
-                        validator: DoubleValidator { bottom: 0 }
+                        validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
+                        onActiveFocusChanged: {
+                            if (activeFocus) text = model.amount === 0 ? "" : model.amount.toString();
+                            else text = model.amount === 0 ? "" : root.currencySymbol + Number(model.amount).toLocaleString(Qt.locale(), 'f', 0)
+                        }
                         onTextEdited: {
+                            let pos      = cursorPosition;
+                            let stripped = text.replace(/^0+(\d)/, '$1');
+                            if (stripped !== text) {
+                                let removed    = text.length - stripped.length;
+                                text           = stripped;
+                                cursorPosition = Math.max(0, pos - removed);
+                            }
                             let val = parseFloat(text)
                             model.amount = isNaN(val) ? 0 : val
                         }

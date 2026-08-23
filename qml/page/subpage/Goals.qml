@@ -2,6 +2,8 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
+import "../../components"
+
 Item {
     id: rootItem // Global root
 
@@ -33,66 +35,67 @@ Item {
                 anchors.fill: parent
                 spacing: 0
 
-                // ACTION BAR
+                // ── ACTION BAR ────────────────────────────────────────────────
                 RowLayout {
                     Layout.fillWidth: true
-                    Layout.margins: 8 // Space between header and table
+                    Layout.margins: 8
+                    spacing: 8
+
+                    // Left: Save + Clear All
+                    SaveButton {
+                        text: "Save"
+                        onClicked: { /* persistence hook */ }
+                    }
+
+                    ClearButton {
+                        text: "Clear All"
+                        onClicked: goalModel.clearAll()
+                    }
+
+                    // Center: title
+                    Item { Layout.fillWidth: true }
 
                     Text {
                         text: "FINANCIAL GOALS"
-                        color: "white"
-                        font.bold: true
-                        font.pixelSize: 14
-                        font.letterSpacing: 1
-                        Layout.preferredWidth: 150
+                        color: "white"; font.bold: true; font.pixelSize: 14; font.letterSpacing: 1
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
+                        Layout.alignment: Qt.AlignHCenter
                     }
 
-                    Item { Layout.fillWidth: true } // Spacer pushes button to the right
+                    Item { Layout.fillWidth: true }
 
+                    // Right: Settings + Add Goal
                     Button {
                         id: settingsBtn
-                        text: "⚙ Settings"
-                        flat: true
+                        text: "⚙ Settings"; flat: true
                         onClicked: settingsDialog.open()
-
                         contentItem: Text {
-                            text: settingsBtn.text; color: "#AAA";
-                            font.bold: true; font.pixelSize: 13; Layout.preferredWidth: 80
+                            text: settingsBtn.text; color: "#AAA"
+                            font.bold: true; font.pixelSize: 13
                             horizontalAlignment: Text.AlignRight; verticalAlignment: Text.AlignVCenter
                         }
-
-                        background: Rectangle {
-                            color: settingsBtn.hovered ? "#1a1a1a" : "transparent"
-                            radius: 15
-                        }
+                        background: Rectangle { color: settingsBtn.hovered ? "#1a1a1a" : "transparent"; radius: 15 }
                     }
 
                     Button {
                         id: addGoalBtn
-                        text: "+ Add Goal"
-                        flat: true
+                        text: "+ Add Goal"; flat: true
                         onClicked: goalModel.addGoal()
                         Layout.rightMargin: 5
-
                         contentItem: Text {
                             text: addGoalBtn.text; color: "#AAA"
-                            font.bold: true; font.pixelSize: 13; Layout.preferredWidth: 80
+                            font.bold: true; font.pixelSize: 13
                             horizontalAlignment: Text.AlignRight; verticalAlignment: Text.AlignVCenter
                         }
-
-                        background: Rectangle {
-                            color: addGoalBtn.hovered ? "#1a1a1a" : "transparent"
-                            radius: 15
-                        }
+                        background: Rectangle { color: addGoalBtn.hovered ? "#1a1a1a" : "transparent"; radius: 15 }
                     }
                 }
 
                 // --- TABLE HEADER ---
                 Rectangle {
                     Layout.fillWidth: true
-                    height: 40
+                    height: 35
                     color: "#181818" // Slightly lighter than background
                     border.color: "#2A2A2A"
 
@@ -156,7 +159,7 @@ Item {
 
                     delegate: Rectangle {
                         id: delegateRoot
-                        width: goalList.width; height: 47
+                        width: goalList.width; height: 44
                         color: rowMA.containsMouse ? "#1A1A1A" : "transparent"
 
                         Rectangle { width: parent.width; height: 1; color: "#222"; anchors.bottom: parent.bottom }
@@ -198,6 +201,13 @@ Item {
                                 Layout.preferredWidth: colYears; horizontalAlignment: Text.AlignHCenter
                                 validator: IntValidator { bottom: 1; top: 100 }
                                 onTextEdited: {
+                                    let pos      = cursorPosition;
+                                    let stripped = text.replace(/^0+(\d)/, '$1');
+                                    if (stripped !== text) {
+                                        let removed    = text.length - stripped.length;
+                                        text           = stripped;
+                                        cursorPosition = Math.max(0, pos - removed);
+                                    }
                                     let val = parseInt(text)
                                     model.yearsLeft = isNaN(val) ? 0 : val
                                 }
@@ -215,12 +225,43 @@ Item {
                                 id: costInput
                                 // We use a property to track if the field is empty to help the "Clear" logic
                                 property bool isEmpty: text === ""
-                                text: model.currentCost === 0 ? "" : Number(model.currentCost).toFixed(0)
-                                color: "white"
+
+                                // Pull fund target values of Emergency fund and Retirement from respective pages
+                                readonly property bool isAutoCost: model.goalName === "Emergency Fund" || model.goalName === "Retirement"
+                                readonly property real autoCost: model.goalName === "Emergency Fund" ? root.emergencyFundTarget
+                                                                : model.goalName === "Retirement" ? retirementCalc.corpusNeeded
+                                                                : 0
+                                onAutoCostChanged: if (isAutoCost) model.currentCost = autoCost
+                                Component.onCompleted: if (isAutoCost) model.currentCost = autoCost
+
+                                text: model.currentCost === 0 ? ""
+                                            : activeFocus ? Number(model.currentCost).toFixed(0)
+                                                : root.currencySymbol + Number(model.currentCost).toLocaleString(Qt.locale(), 'f', 0)
+                                placeholderText: isAutoCost && model.currentCost === 0
+                                                     ? (model.goalName === "Emergency Fund" ? "Fill Emergency Fund page" : "Fill Retirement page")
+                                                     : ""
+                                toolTipText: isAutoCost
+                                                 ? (model.goalName === "Emergency Fund"
+                                                        ? "Auto-filled from Emergency Fund's target amount"
+                                                        : "Auto-filled from Retirement's corpus needed")
+                                                 : ""
+                                color: isAutoCost ? "#888" : "white"
+                                enabled: !isAutoCost
                                 Layout.preferredWidth: colCost
                                 horizontalAlignment: Text.AlignRight
-                                validator: DoubleValidator { bottom: 0 }
+                                validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
+                                onActiveFocusChanged: {
+                                    if (activeFocus) text = model.currentCost === 0 ? "" : Number(model.currentCost).toFixed(0)
+                                    else text = model.currentCost === 0 ? "" : root.currencySymbol + Number(model.currentCost).toLocaleString(Qt.locale(), 'f', 0)
+                                }
                                 onTextEdited: {
+                                    let pos      = cursorPosition;
+                                    let stripped = text.replace(/^0+(\d)/, '$1');
+                                    if (stripped !== text) {
+                                        let removed    = text.length - stripped.length;
+                                        text           = stripped;
+                                        cursorPosition = Math.max(0, pos - removed);
+                                    }
                                     let val = parseFloat(text)
                                     model.currentCost = isNaN(val) ? 0 : val
                                 }
@@ -229,14 +270,12 @@ Item {
                             // Available Today
                             GoalInput {
                                 id: availableInput
-                                text: model.currentFunded === 0 ? "" : Number(model.currentFunded).toFixed(0)
-                                color: "white"
+                                text: model.currentFunded === 0 ? "" : root.currencySymbol + Number(model.currentFunded).toLocaleString(Qt.locale(), 'f', 0)
+                                placeholderText: "Link in Portfolio"
+                                toolTipText: "Auto-filled from Portfolio assets linked to this goal"
+                                color: "#999"
+                                enabled: false
                                 Layout.preferredWidth: colFunded; horizontalAlignment: Text.AlignRight
-                                validator: DoubleValidator { bottom: 0 }
-                                onTextEdited: {
-                                    let val = parseFloat(text)
-                                    model.currentFunded = isNaN(val) ? 0 : val
-                                }
                             }
 
                             // Future Target
@@ -292,77 +331,112 @@ Item {
             }
         }
 
-        // PROGRESS BARS AREA
+        // ── PROGRESS BARS ─────────────────────────────────────────────────────
+        // Two bars per goal in two columns: left = SIP velocity, right = corpus funded
         Rectangle {
             id: velocityContainer
             Layout.fillWidth: true
-            Layout.preferredHeight: 150
-            color: "#121212"
-            border.color: "#2A2A2A"
-            radius: 4
-            clip: true
+            Layout.preferredHeight: 160
+            color: "#121212"; border.color: "#2A2A2A"; radius: 4; clip: true
 
             ScrollView {
                 id: velocityScroll
-                anchors.fill: parent
-                anchors.margins: 15
+                anchors.fill: parent; anchors.margins: 15
                 clip: true
-
                 contentHeight: velocityLayout.implicitHeight
                 contentWidth: availableWidth
 
-                ColumnLayout {
+                GridLayout {
                     id: velocityLayout
-                    // FIX 3: Use availableWidth minus a small gutter for the scrollbar
                     width: velocityScroll.availableWidth - 12
-                    spacing: 15
+                    columns: 2
+                    columnSpacing: 24
+                    rowSpacing: 14
 
                     Repeater {
                         model: goalModel
-                        delegate: ColumnLayout {
+                        delegate: Item {
+                            // Each delegate fills one grid cell
                             Layout.fillWidth: true
-                            spacing: 6
+                            implicitHeight: barCol.implicitHeight
 
-                            readonly property real velocityRatio: model.requiredSIP > 0 ? (model.actualSIP / model.requiredSIP) : 0
-                            readonly property real percentage: velocityRatio * 100
+                            // ── SIP velocity: actual SIP ÷ required SIP ──────
+                            readonly property real sipRatio:    model.requiredSIP > 0
+                                                                    ? model.actualSIP / model.requiredSIP : 0
+                            // ── Corpus coverage: funded today ÷ today's cost ─
+                            readonly property real fundedRatio: model.currentCost > 0
+                                                                    ? model.currentFunded / model.currentCost : 0
 
-                            readonly property color barColor: {
-                                if (percentage < 25) return "#FF0000"       // 0-25: Red
-                                if (percentage < 50) return "#FF8C00"       // 25-50: Orange
-                                if (percentage < 75) return "#FFD700"       // 50-75: Yellow/Gold
-                                if (percentage < 100) return "#43e97b"      // 75-99: Green
-
-                                // 100+: Use Horizon Accent Colors
-                                if (model.yearsLeft < 2) return "#00d2ff"   // Short (Blue)
-                                if (model.yearsLeft < 5) return "#f1c40f"   // Medium (Gold)
-                                return "#A29BFE"                            // Long (Purple)
+                            // SIP bar: red→orange→yellow→green→horizon accent
+                            readonly property color sipColor: {
+                                var p = sipRatio * 100
+                                if (p <= 0)  return "#555"      // 0% — neutral grey, not alarming
+                                if (p < 25)  return "#FF0000"
+                                if (p < 50)  return "#FF8C00"
+                                if (p < 75)  return "#FFD700"
+                                if (p < 100) return "#43e97b"
+                                if (model.yearsLeft < 2) return "#00d2ff"
+                                if (model.yearsLeft < 5) return "#f1c40f"
+                                return "#A29BFE"
                             }
 
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Text {
-                                    text: model.goalName
-                                    color: "white"
-                                    font.pixelSize: 12; font.bold: true
+                            // Corpus funded bar: neutral when empty, teal→green as it fills
+                            readonly property color fundedColor: {
+                                var p = fundedRatio * 100
+                                if (p <= 0)  return "#3d6b85"   // distinct muted blue — visible but calm
+                                if (p < 25)  return "#0097a7"
+                                if (p < 75)  return "#00b894"
+                                return "#43e97b"
+                            }
+
+                            ColumnLayout {
+                                id: barCol
+                                anchors.fill: parent
+                                spacing: 4
+
+                                // Goal name + both percentages
+                                RowLayout {
                                     Layout.fillWidth: true
-                                    elide: Text.ElideRight
+                                    Text {
+                                        text: model.goalName
+                                        color: "white"; font.pixelSize: 11; font.bold: true
+                                        Layout.fillWidth: true; elide: Text.ElideRight
+                                    }
+                                    // SIP coverage %
+                                    Text {
+                                        text: "SIP " + (sipRatio * 100).toFixed(0) + "%"
+                                        color: sipColor; font.pixelSize: 10; font.family: "Monospace"
+                                    }
+                                    Text { text: "·"; color: "#444"; font.pixelSize: 10 }
+                                    // Corpus funded %
+                                    Text {
+                                        text: "Corpus " + (fundedRatio * 100).toFixed(0) + "%"
+                                        color: fundedColor; font.pixelSize: 10; font.family: "Monospace"
+                                    }
                                 }
-                                Text {
-                                    text: (velocityRatio * 100).toFixed(0) + "%"
-                                    color: barColor
-                                    font.pixelSize: 11; font.family: "Monospace"
-                                }
-                            }
 
-                            Rectangle {
-                                Layout.fillWidth: true
-                                height: 6; color: "#2A2A2A"
+                                // SIP velocity bar
                                 Rectangle {
-                                    anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
-                                    width: Math.min(1.0, velocityRatio) * parent.width
-                                    color: barColor
-                                    Behavior on width { NumberAnimation { duration: 800; easing.type: Easing.OutCubic } }
-                                    Behavior on color { ColorAnimation { duration: 500 } }
+                                    Layout.fillWidth: true; height: 5; color: "#2A2A2A"; radius: 2
+                                    Rectangle {
+                                        anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                                        width: Math.min(1.0, sipRatio) * parent.width; radius: 2
+                                        color: sipColor
+                                        Behavior on width { NumberAnimation { duration: 700; easing.type: Easing.OutCubic } }
+                                        Behavior on color { ColorAnimation { duration: 400 } }
+                                    }
+                                }
+
+                                // Corpus funded bar — slightly brighter track so it reads even when empty
+                                Rectangle {
+                                    Layout.fillWidth: true; height: 5; color: "#2d3f4a"; radius: 2
+                                    Rectangle {
+                                        anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                                        width: Math.min(1.0, fundedRatio) * parent.width; radius: 2
+                                        color: fundedColor
+                                        Behavior on width { NumberAnimation { duration: 700; easing.type: Easing.OutCubic } }
+                                        Behavior on color { ColorAnimation { duration: 400 } }
+                                    }
                                 }
                             }
                         }
@@ -370,24 +444,6 @@ Item {
                 }
             }
         }
-
-        // FOOTER SUMMARY
-        // Rectangle {
-        //     Layout.fillWidth: true; Layout.preferredHeight: 80
-        //     color: "#ffffff"; radius: 4
-        //     RowLayout {
-        //         anchors.fill: parent; anchors.margins: 20
-        //         Column {
-        //             Label { text: "TOTAL SIP"; color: "#888888"; font.pixelSize: 10; font.bold: true }
-        //             Label { text: "₹ 0.00"; color: "#000000"; font.pixelSize: 20; font.bold: true }
-        //         }
-        //         Item { Layout.fillWidth: true }
-        //         Column {
-        //             Label { text: "COVERAGE RATIO"; color: "#888888"; font.pixelSize: 10; font.bold: true }
-        //             Label { text: "0.0%"; color: "#000000"; font.pixelSize: 20; font.bold: true }
-        //         }
-        //     }
-        // }
 
         // --- FOOTER SUMMARY ---
         Rectangle {
@@ -418,7 +474,91 @@ Item {
                     }
                 }
 
-                Item { Layout.fillWidth: true } // Spacer pushes next item to the far right
+                Item {
+
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    // CENTER COLUMN: STATUS COUNTS
+                    RowLayout {
+                        id: statusCounts
+                        anchors.centerIn: parent
+                        spacing: 18
+
+                        // Hidden tally repeater reuses the same per-row fundedRatio
+                        // definition as the velocity grid above, via role properties
+                        // (no raw role numbers, matches the existing delegate pattern).
+                        property int completedCount: 0
+                        property int onTrackCount: 0
+                        property int underfundedCount: 0
+
+                        function scheduleRetally() { Qt.callLater(statusCounts.retally) }
+
+                        Repeater {
+                            id: tallyRepeater
+                            model: goalModel
+                            delegate: Item {
+                                Layout.preferredWidth: 0
+                                Layout.preferredHeight: 0
+                                readonly property real fundedRatio: model.currentCost > 0
+                                                                        ? model.currentFunded / model.currentCost : 0
+                                readonly property real sipRatio: model.requiredSIP > 0 ? model.actualSIP / model.requiredSIP : 0
+                                readonly property int status: fundedRatio >= 1.0 ? 2 : (sipRatio >= 1.0 ? 1 : 0)
+                            }
+                            onItemAdded: statusCounts.scheduleRetally()
+                            onItemRemoved: statusCounts.scheduleRetally()
+                        }
+                        Connections {
+                            target: goalModel
+                            function onDataChanged() { statusCounts.scheduleRetally() }
+                            function onModelReset() { statusCounts.scheduleRetally() }
+                        }
+                        Component.onCompleted: scheduleRetally()
+
+                        function retally() {
+                            var completed = 0, onTrack = 0, underfunded = 0
+                            for (var i = 0; i < tallyRepeater.count; i++) {
+                                var it = tallyRepeater.itemAt(i)
+                                if (!it) continue
+                                var s = it.status
+                                if (s === 2) completed++
+                                else if (s === 1) onTrack++
+                                else underfunded++
+                            }
+                            completedCount = completed
+                            onTrackCount = onTrack
+                            underfundedCount = underfunded
+                        }
+
+                        ColumnLayout {
+                            spacing: 2
+                            Label { text: "ON TRACK"; color: "#888888"; font.pixelSize: 10; font.bold: true }
+                            Label {
+                                text: statusCounts.onTrackCount
+                                color: "#f1c40f"; font.pixelSize: 20; font.bold: true
+                                Layout.alignment: Qt.AlignHCenter
+                            }
+                        }
+                        ColumnLayout {
+                            spacing: 2
+                            Label { text: "UNDERFUNDED"; color: "#888888"; font.pixelSize: 10; font.bold: true }
+                            Label {
+                                text: statusCounts.underfundedCount
+                                color: "#FF0000"; font.pixelSize: 20; font.bold: true
+                                Layout.alignment: Qt.AlignHCenter
+                            }
+                        }
+                        ColumnLayout {
+                            spacing: 2
+                            Label { text: "COMPLETED"; color: "#888888"; font.pixelSize: 10; font.bold: true }
+                            Label {
+                                text: statusCounts.completedCount
+                                color: "#43e97b"; font.pixelSize: 20; font.bold: true
+                                Layout.alignment: Qt.AlignHCenter
+                            }
+                        }
+                    }
+                }
 
                 // RIGHT COLUMN: COVERAGE (Using ColumnLayout for alignment)
                 ColumnLayout {
@@ -446,34 +586,254 @@ Item {
 
     // --- TIER SETTINGS DIALOG ---
     Dialog {
-        id: settingsDialog; title: "Tier Strategy Configuration";
+        id: settingsDialog
         x: parent.width - width - 20
         y: 80
-        modal: true; standardButtons: Dialog.Save | Dialog.Cancel
+        width: 380
+        modal: true
+        standardButtons: Dialog.NoButton
+        padding: 0
 
-        ColumnLayout {
-            spacing: 15
-            GridLayout {
-                columns: 3; rowSpacing: 10; columnSpacing: 20
-                Item {} Label { text: "Inflation %"; font.bold: true; color: "#888" } Label { text: "Returns %"; font.bold: true; color: "#888" }
+        background: Rectangle {
+            color: "#141414"
+            border.color: "#2A2A2A"
+            radius: 8
+        }
 
-                Label { text: "Short Term (<2y)"; color: "#00d2ff" }
-                TextField { id: sInf; text: goalModel.shortInf; width: 60 }
-                TextField { id: sRet; text: goalModel.shortRet; width: 60 }
+        // Custom header
+        header: Rectangle {
+            width: parent.width
+            height: 50
+            color: "#1A1A1A"
+            radius: 8
 
-                Label { text: "Medium Term (2-5y)"; color: "#f1c40f" }
-                TextField { id: mInf; text: goalModel.medInf; width: 60 }
-                TextField { id: mRet; text: goalModel.medRet; width: 60 }
+            // Bottom edge square so it blends with the body
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 8
+                color: parent.color
+            }
 
-                Label { text: "Long Term (>5y)"; color: "#a29bfe" }
-                TextField { id: lInf; text: goalModel.longInf; width: 60 }
-                TextField { id: lRet; text: goalModel.longRet; width: 60 }
+            Text {
+                text: "TIER SETTINGS"
+                color: "white"
+                font.bold: true
+                font.pixelSize: 14
+                font.letterSpacing: 1
+                anchors.centerIn: parent
+            }
+
+            // Close (X) button
+            Rectangle {
+                width: 28; height: 28; radius: 14
+                anchors.right: parent.right; anchors.rightMargin: 11
+                anchors.verticalCenter: parent.verticalCenter
+                color: closeArea.containsMouse ? "#2a2a2a" : "transparent"
+                Behavior on color { ColorAnimation { duration: 120 } }
+
+                Text { text: "×"; color: "#888"; font.pixelSize: 18; anchors.centerIn: parent }
+
+                MouseArea {
+                    id: closeArea; anchors.fill: parent; hoverEnabled: true
+                    onClicked: settingsDialog.reject()
+                }
             }
         }
-        onAccepted: {
-            goalModel.updateSettings(parseFloat(sInf.text), parseFloat(sRet.text),
-                                    parseFloat(mInf.text), parseFloat(mRet.text),
-                                    parseFloat(lInf.text), parseFloat(lRet.text))
+
+        ColumnLayout {
+            width: 380
+            spacing: 12
+
+            // Column header row
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                Item { Layout.preferredWidth: 130 }
+                Text { text: "INFLATION %"; color: "#555"; font.pixelSize: 10; font.bold: true; Layout.preferredWidth: 100; horizontalAlignment: Text.AlignHCenter }
+                Text { text: "RETURNS %";   color: "#555"; font.pixelSize: 10; font.bold: true; Layout.preferredWidth: 100; horizontalAlignment: Text.AlignHCenter }
+            }
+
+            // SHORT TERM TIER
+            Rectangle {
+                Layout.fillWidth: true; height: 56
+                color: "#1A1A1A"; radius: 6
+
+                // Left accent bar
+                Rectangle { width: 3; height: parent.height; radius: 2; color: "#00d2ff"; anchors.left: parent.left }
+
+                RowLayout {
+                    anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 12; spacing: 0
+
+                    Text {
+                        text: "Short Term  <2y"
+                        color: "#00d2ff"; font.pixelSize: 12; font.bold: true
+                        Layout.preferredWidth: 118
+                    }
+
+                    TextField {
+                        id: sInf; text: goalModel.shortInf
+                        width: 70; height: 30
+                        horizontalAlignment: Text.AlignHCenter
+                        color: "white"
+                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
+                        Layout.preferredWidth: 70; Layout.preferredHeight: 30
+                        background: Rectangle {
+                            color: "#222"; radius: 4
+                            border.color: sInf.activeFocus ? "#00d2ff" : "#333"; border.width: 1
+                        }
+                    }
+
+                    Item { Layout.preferredWidth: 28 }
+
+                    TextField {
+                        id: sRet; text: goalModel.shortRet
+                        width: 70; height: 30
+                        horizontalAlignment: Text.AlignHCenter
+                        color: "white"
+                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
+                        Layout.preferredWidth: 70; Layout.preferredHeight: 30
+                        background: Rectangle {
+                            color: "#222"; radius: 4
+                            border.color: sRet.activeFocus ? "#00d2ff" : "#333"; border.width: 1
+                        }
+                    }
+                }
+            }
+
+            // MEDIUM TERM TIER
+            Rectangle {
+                Layout.fillWidth: true; height: 56
+                color: "#1A1A1A"; radius: 6
+
+                Rectangle { width: 3; height: parent.height; radius: 2; color: "#f1c40f"; anchors.left: parent.left }
+
+                RowLayout {
+                    anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 12; spacing: 0
+
+                    Text {
+                        text: "Medium  2–5y"
+                        color: "#f1c40f"; font.pixelSize: 12; font.bold: true
+                        Layout.preferredWidth: 118
+                    }
+
+                    TextField {
+                        id: mInf; text: goalModel.medInf
+                        horizontalAlignment: Text.AlignHCenter
+                        color: "white"
+                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
+                        Layout.preferredWidth: 70; Layout.preferredHeight: 30
+                        background: Rectangle {
+                            color: "#222"; radius: 4
+                            border.color: mInf.activeFocus ? "#f1c40f" : "#333"; border.width: 1
+                        }
+                    }
+
+                    Item { Layout.preferredWidth: 28 }
+
+                    TextField {
+                        id: mRet; text: goalModel.medRet
+                        horizontalAlignment: Text.AlignHCenter
+                        color: "white"
+                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
+                        Layout.preferredWidth: 70; Layout.preferredHeight: 30
+                        background: Rectangle {
+                            color: "#222"; radius: 4
+                            border.color: mRet.activeFocus ? "#f1c40f" : "#333"; border.width: 1
+                        }
+                    }
+                }
+            }
+
+            // LONG TERM TIER
+            Rectangle {
+                Layout.fillWidth: true; height: 56
+                color: "#1A1A1A"; radius: 6
+
+                Rectangle { width: 3; height: parent.height; radius: 2; color: "#a29bfe"; anchors.left: parent.left }
+
+                RowLayout {
+                    anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 12; spacing: 0
+
+                    Text {
+                        text: "Long Term  >5y"
+                        color: "#a29bfe"; font.pixelSize: 12; font.bold: true
+                        Layout.preferredWidth: 118
+                    }
+
+                    TextField {
+                        id: lInf; text: goalModel.longInf
+                        horizontalAlignment: Text.AlignHCenter
+                        color: "white"
+                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
+                        Layout.preferredWidth: 70; Layout.preferredHeight: 30
+                        background: Rectangle {
+                            color: "#222"; radius: 4
+                            border.color: lInf.activeFocus ? "#a29bfe" : "#333"; border.width: 1
+                        }
+                    }
+
+                    Item { Layout.preferredWidth: 28 }
+
+                    TextField {
+                        id: lRet; text: goalModel.longRet
+                        horizontalAlignment: Text.AlignHCenter
+                        color: "white"
+                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
+                        Layout.preferredWidth: 70; Layout.preferredHeight: 30
+                        background: Rectangle {
+                            color: "#222"; radius: 4
+                            border.color: lRet.activeFocus ? "#a29bfe" : "#333"; border.width: 1
+                        }
+                    }
+                }
+            }
+
+            // Save / Cancel buttons
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                Layout.bottomMargin: 4
+                Layout.alignment: Qt.AlignHCenter
+                spacing: 16
+
+                Item { Layout.fillWidth: true }
+
+                Rectangle {
+                    width: 90; height: 32; radius: 6
+                    color: cancelBtnArea.containsMouse ? "#2a2a2a" : "#1e1e1e"
+                    border.color: "#444"; border.width: 1
+                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                    Text { text: "Cancel"; color: "#888"; font.pixelSize: 13; anchors.centerIn: parent }
+
+                    MouseArea {
+                        id: cancelBtnArea; anchors.fill: parent; hoverEnabled: true
+                        onClicked: settingsDialog.reject()
+                    }
+                }
+
+                Rectangle {
+                    width: 90; height: 32; radius: 6
+                    color: saveBtnArea.containsMouse ? "#005fa3" : "#0078D4"
+                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                    Text { text: "Save"; color: "white"; font.pixelSize: 13; font.bold: true; anchors.centerIn: parent }
+
+                    MouseArea {
+                        id: saveBtnArea; anchors.fill: parent; hoverEnabled: true
+                        onClicked: {
+                            goalModel.updateSettings(parseFloat(sInf.text), parseFloat(sRet.text),
+                                                     parseFloat(mInf.text), parseFloat(mRet.text),
+                                                     parseFloat(lInf.text), parseFloat(lRet.text))
+                            settingsDialog.accept()
+                        }
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+            }
         }
     }
 
@@ -482,19 +842,43 @@ Item {
     }
 
     component GoalInput : TextInput {
-        color: "white"; font.pixelSize: 13; selectByMouse: true
+        id: goalInput
+        color: "white"; font.pixelSize: 13
+        selectByMouse: true          // allows click-drag selection
+        mouseSelectionMode: TextInput.SelectCharacters
+        cursorVisible: activeFocus
         verticalAlignment: Text.AlignVCenter
         clip: true
 
-        Rectangle {
-            anchors.bottom: parent.bottom; width: parent.width; height: 1
-            color: parent.activeFocus ? "#00d2ff" : (inputMA.containsMouse ? "#444" : "transparent")
+        property string placeholderText: ""
+        property string toolTipText: ""
+
+        Text {
+            anchors.fill: parent
+            visible: goalInput.text === "" && goalInput.placeholderText !== ""
+            text: goalInput.placeholderText
+            color: "#555"; font.pixelSize: 11; font.italic: true
+            horizontalAlignment: goalInput.horizontalAlignment
+            verticalAlignment: Text.AlignVCenter
         }
 
+        // Underline that highlights on focus/hover
+        Rectangle {
+            anchors.bottom: parent.bottom; width: parent.width; height: 1
+            color: parent.activeFocus ? "#00d2ff" : (underlineMA.containsMouse ? "#444" : "transparent")
+        }
+
+        // Thin hover area just to change cursor — does NOT consume mouse so TextInput
+        // keeps full selection/click handling
         MouseArea {
-            id: inputMA
-            anchors.fill: parent; cursorShape: Qt.IBeamCursor; hoverEnabled: true
-            onClicked: (mouse) => { parent.forceActiveFocus(); }
+            id: underlineMA
+            anchors.fill: parent; hoverEnabled: true
+            cursorShape: goalInput.enabled ? Qt.IBeamCursor : Qt.ArrowCursor
+            acceptedButtons: Qt.NoButton  // pass all clicks through to TextInput
+
+            ToolTip.visible: goalInput.toolTipText !== "" && containsMouse
+            ToolTip.text: goalInput.toolTipText
+            ToolTip.delay: 400
         }
     }
 }

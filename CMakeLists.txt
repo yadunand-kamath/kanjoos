@@ -10,16 +10,18 @@ find_package(Qt6 REQUIRED COMPONENTS Quick Core Gui Qml Charts Widgets QuickCont
 
 qt_standard_project_setup(REQUIRES 6.10)
 
+set_source_files_properties(qml/AssetRegistry.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
 qt_add_executable(appkanjoos
     main.cpp
     cpp/RetirementCalculator.h
     cpp/RetirementAssetModel.h
-    cpp/RetirementCalculator.cpp
     cpp/InsuranceCalculator.h
     cpp/InsuranceCalculator.cpp
     cpp/GoalModel.h
     cpp/SipModel.h
     cpp/SipFilterProxy.h
+    cpp/PolicyModel.h
 )
 
 qt_add_qml_module(appkanjoos
@@ -28,6 +30,7 @@ qt_add_qml_module(appkanjoos
         Main.qml
 
         qml/TitleBar.qml
+		qml/AssetRegistry.qml
 
         qml/page/CashFlow.qml
         qml/page/Overview.qml
@@ -37,16 +40,23 @@ qt_add_qml_module(appkanjoos
 
         qml/page/subpage/EmergencyFund.qml
         qml/page/subpage/InsuranceTracker.qml
+        qml/page/subpage/InsuranceDiagnosticPopup.qml
+        qml/page/subpage/PolicyVaultPopup.qml
         qml/page/subpage/Retirement.qml
         qml/page/subpage/Goals.qml
         qml/page/subpage/SIPPlanner.qml
         qml/page/subpage/SipTable.qml
-        qml/page/subpage/ChartsPopup.qml
+        qml/page/subpage/SipChartsPopup.qml
+        qml/page/subpage/PortfolioChartsPopup.qml
 
         qml/components/CustomComboBox.qml
         qml/components/CustomSlider.qml
         qml/components/ClearButton.qml
         qml/components/SaveButton.qml
+        qml/components/InsuranceCheckBox.qml
+        qml/components/InsuranceUnderlineInput.qml
+        qml/components/FrequencyToggle.qml
+        qml/components/VaultField.qml
 
     RESOURCES
         assets/fonts/BJCree-Bold.ttf

@@ -10,6 +10,7 @@
 #include "cpp/SipFilterProxy.h"
 #include "cpp/SipModel.h"
 #include "cpp/PortfolioModel.h"
+#include "cpp/PolicyModel.h"
 
 int main(int argc, char *argv[])
 {
@@ -28,6 +29,18 @@ int main(int argc, char *argv[])
     RetirementAssetModel *retirementAssetModel = new RetirementAssetModel(&app);
     engine.rootContext()->setContextProperty("retirementAssetModel", retirementAssetModel);
 
+    // Keep the calculator's accumulated totals in sync with the asset model.
+    // Batched into one push per assetsChanged so total/liquid/lockedRatio are
+    // never briefly inconsistent with each other mid-recalculation.
+    auto pushAccumulated = [retirementCalc, retirementAssetModel]() {
+        retirementCalc->setAccumulated(retirementAssetModel->totalValue(),
+                                        retirementAssetModel->liquidValue(),
+                                        retirementAssetModel->lockedRatio());
+    };
+    QObject::connect(retirementAssetModel, &RetirementAssetModel::assetsChanged,
+                      retirementCalc, pushAccumulated);
+    pushAccumulated(); // seed initial state (ctor default would otherwise sit at 0 until the page loads)
+
     SipModel *sipModel = new SipModel(&app);
     GoalModel *goalModel = new GoalModel(&app);
 
@@ -45,6 +58,9 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("sipModel", sipModel);
     engine.rootContext()->setContextProperty("goalModel", goalModel);
     engine.rootContext()->setContextProperty("portfolioModel", portfolioModel);
+
+    PolicyModel *policyModel = new PolicyModel(&app);
+    engine.rootContext()->setContextProperty("policyModel", policyModel);
 
     // Arguments: (Plugin Name, Major Version, Minor Version, QML Type Name)
     qmlRegisterType<SipFilterProxy>("FinancialComponents", 1, 0, "SipFilterProxy");

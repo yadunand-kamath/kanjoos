@@ -10,19 +10,15 @@ Button {
     palette.buttonText: "white"
     hoverEnabled: true
 
-    onClicked: {
-    }
+    onClicked: {}
 
     background: Rectangle {
-        implicitWidth: 90
-        implicitHeight: 32
+        implicitWidth: 90; implicitHeight: 32
         radius: 6
-        color: saveBtn.hovered ? "#333" : "#222"
-
-        // Smoothly transition the color change
-        Behavior on color { ColorAnimation { duration: 150 } }
-
+        color: saveBtn.hovered ? "#0a2e14" : "#222"
         border.width: 1
-        border.color: saveBtn.hovered ? "white" : "transparent"
+        border.color: saveBtn.hovered ? "#1a7a3a" : "transparent"
+        Behavior on color       { ColorAnimation { duration: 150 } }
+        Behavior on border.color { ColorAnimation { duration: 150 } }
     }
 }

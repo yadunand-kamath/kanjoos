@@ -21,22 +21,22 @@ public:
 
     explicit SipModel(QObject *parent = nullptr) : QAbstractListModel(parent) {
         // EQUITY SIPs
-        m_data << SipItem{"Equity", "Nifty 50 Index", "Domestic", "Mutual Fund", "Largecap", "Retirement", 25000.0};
-        m_data << SipItem{"Equity", "Smallcap Fund", "Domestic", "Mutual Fund", "Smallcap", "Retirement", 10000.0};
-        m_data << SipItem{"Equity", "Nasdaq 100", "International", "ETF", "Largecap", "Home Downpayment", 15000.0};
+        // m_data << SipItem{"Equity", "Nifty 50 Index", "Domestic", "Mutual Fund", "Largecap", "Retirement", 25000.0};
+        // m_data << SipItem{"Equity", "Smallcap Fund", "Domestic", "Mutual Fund", "Smallcap", "Retirement", 10000.0};
+        // m_data << SipItem{"Equity", "Nasdaq 100", "International", "ETF", "Largecap", "Home Downpayment", 15000.0};
 
-        // DEBT SIPs
-        m_data << SipItem{"Debt", "Recurring Deposit", "Domestic", "FD/RD", "-", "Emergency Fund", 10000.0};
-        m_data << SipItem{"Debt", "PPF", "Domestic", "Govt. Scheme", "-", "Retirement", 12500.0};
+        // // DEBT SIPs
+        // m_data << SipItem{"Debt", "Recurring Deposit", "Domestic", "FD/RD", "-", "Emergency Fund", 10000.0};
+        // m_data << SipItem{"Debt", "PPF", "Domestic", "Govt. Scheme", "-", "Retirement", 12500.0};
 
-        // REAL ESTATE SIPs
-        m_data << SipItem{"Real Estate", "REIT Monthly", "Domestic", "REITs", "-", "World Tour", 5000.0};
+        // // REAL ESTATE SIPs
+        // m_data << SipItem{"Real Estate", "REIT Monthly", "Domestic", "REITs", "-", "World Tour", 5000.0};
 
-        // COMMODITY SIPs
-        m_data << SipItem{"Commodity", "Digital Gold", "Domestic", "Digital", "-", "Emergency Fund", 2500.0};
+        // // COMMODITY SIPs
+        // m_data << SipItem{"Commodity", "Digital Gold", "Domestic", "Digital", "-", "Emergency Fund", 2500.0};
 
-        // CRYPTO SIPs
-        m_data << SipItem{"Crypto", "ETH SIP", "-", "-", "-", "None", 1000.0};
+        // // CRYPTO SIPs
+        // m_data << SipItem{"Crypto", "ETH SIP", "-", "-", "-", "None", 1000.0};
     }
 
     int rowCount(const QModelIndex &parent = QModelIndex()) const override { return m_data.count(); }
@@ -79,7 +79,7 @@ public:
     Q_INVOKABLE void addEntry(QString type) {
         int row = m_data.count();
         beginInsertRows(QModelIndex(), row, row);
-        m_data << SipItem{type, "New " + type, "Domestic", "Other", "-", "None", 0.0};
+        m_data << SipItem{type, "New " + type, "Domestic", "Other", "-", "", 0.0};
         endInsertRows();
         emit sipUpdated();
     }
@@ -88,8 +88,35 @@ public:
         beginRemoveRows(parent, row, row + count - 1);
         m_data.removeAt(row);
         endRemoveRows();
-        emit sipUpdated(); // Force Goals table to refresh
+        emit sipUpdated();
         return true;
+    }
+
+    // Called by SipFilterProxy::removeRow via QMetaObject::invokeMethod
+    Q_INVOKABLE void removeEntry(int row) {
+        if (row < 0 || row >= m_data.count()) return;
+        removeRows(row, 1);
+    }
+
+    // Remove all entries of a specific asset type
+    Q_INVOKABLE void clearAsset(const QString &type) {
+        for (int i = m_data.count() - 1; i >= 0; --i) {
+            if (m_data[i].assetType == type) {
+                beginRemoveRows(QModelIndex(), i, i);
+                m_data.removeAt(i);
+                endRemoveRows();
+            }
+        }
+        emit sipUpdated();
+    }
+
+    // Remove all SIP entries
+    Q_INVOKABLE void clearAll() {
+        if (m_data.isEmpty()) return;
+        beginResetModel();
+        m_data.clear();
+        endResetModel();
+        emit sipUpdated();
     }
 
     Q_INVOKABLE double getTotal(QString type) {

@@ -16,6 +16,7 @@ Window {
     property string currencySymbol: "₹" // INR
     property real globalMonthlyIncome: cashflowPage.totalIncome
     property real globalMonthlyExpense: cashflowPage.totalExpense
+    property real emergencyFundTarget: safetynetPage.emergencyFundSubPage.targetAmount
     property real insuranceTotalFromSafety: 0
     property bool syncInsuranceToCashflow: false
 
@@ -71,8 +72,8 @@ Window {
 
             NavButton { text: qsTr("Overview") }
             NavButton { text: qsTr("Cash Flow") }
-            NavButton { text: qsTr("Safety net") }
-            NavButton { text: qsTr("SIP Planner") }
+            NavButton { text: qsTr("Safety Net") }
+            NavButton { text: qsTr("Planner") }
             NavButton { text: qsTr("Portfolio") }
         }
 
