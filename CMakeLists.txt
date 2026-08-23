@@ -21,6 +21,7 @@ qt_add_executable(appkanjoos
     cpp/GoalModel.h
     cpp/SipModel.h
     cpp/SipFilterProxy.h
+    cpp/PolicyModel.h
 )
 
 qt_add_qml_module(appkanjoos
@@ -39,6 +40,8 @@ qt_add_qml_module(appkanjoos
 
         qml/page/subpage/EmergencyFund.qml
         qml/page/subpage/InsuranceTracker.qml
+        qml/page/subpage/InsuranceDiagnosticPopup.qml
+        qml/page/subpage/PolicyVaultPopup.qml
         qml/page/subpage/Retirement.qml
         qml/page/subpage/Goals.qml
         qml/page/subpage/SIPPlanner.qml
@@ -50,6 +53,10 @@ qt_add_qml_module(appkanjoos
         qml/components/CustomSlider.qml
         qml/components/ClearButton.qml
         qml/components/SaveButton.qml
+        qml/components/InsuranceCheckBox.qml
+        qml/components/InsuranceUnderlineInput.qml
+        qml/components/FrequencyToggle.qml
+        qml/components/VaultField.qml
 
     RESOURCES
         assets/fonts/BJCree-Bold.ttf

@@ -10,6 +10,7 @@
 #include "cpp/SipFilterProxy.h"
 #include "cpp/SipModel.h"
 #include "cpp/PortfolioModel.h"
+#include "cpp/PolicyModel.h"
 
 int main(int argc, char *argv[])
 {
@@ -57,6 +58,9 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("sipModel", sipModel);
     engine.rootContext()->setContextProperty("goalModel", goalModel);
     engine.rootContext()->setContextProperty("portfolioModel", portfolioModel);
+
+    PolicyModel *policyModel = new PolicyModel(&app);
+    engine.rootContext()->setContextProperty("policyModel", policyModel);
 
     // Arguments: (Plugin Name, Major Version, Minor Version, QML Type Name)
     qmlRegisterType<SipFilterProxy>("FinancialComponents", 1, 0, "SipFilterProxy");
